@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { Modal, View, Text, TouchableOpacity, TouchableWithoutFeedback } from "react-native";
-import { X, Copy } from "lucide-react-native";
+import { Modal, TouchableWithoutFeedback } from "react-native";
+import { X, Copy, Check } from "lucide-react-native";
 import { Profile } from "../types";
-import { QRCodeMock } from "./QRCodeMock";
 import * as Clipboard from "expo-clipboard";
+import { generatePixBRCode } from "../utils/pix";
+import { QRCodePix } from "./QRCodePix";
+import styled from "styled-components/native";
 
 interface PixModalProps {
   profile: Profile;
@@ -20,7 +22,9 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
   const pixKey = profile.pixKey || "11999887766";
   const pixName = profile.pixName || profile.name;
   const pixCity = profile.pixCity || "São Paulo";
-  const emvCode = `00020126580014br.gov.bcb.pix0136${pixKey}5204000053039865802BR5913${(pixName + "             ").slice(0, 13)}6009${(pixCity + "         ").slice(0, 9)}62070503***6304ABCD`;
+
+  // Gera o código EMV real
+  const emvCode = generatePixBRCode(pixKey, amount, pixName, pixCity);
 
   const copy = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
@@ -31,77 +35,255 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/60 justify-end z-50">
+        <Backdrop>
           <TouchableWithoutFeedback>
-            <View className="bg-white w-full rounded-t-3xl px-5 pt-3 pb-10">
-              <View className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-              
-              <View className="flex-row justify-between items-center mb-5">
-                <Text className="text-xl font-extrabold text-gray-900">Gerar Pix</Text>
-                <TouchableOpacity 
-                  onPress={onClose} 
-                  className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
-                >
+            <Sheet>
+              <Handle />
+
+              <HeaderRow>
+                <SheetTitle>Gerar Pix</SheetTitle>
+                <CloseBtn onPress={onClose} activeOpacity={0.7}>
                   <X size={16} color="#4B5563" />
-                </TouchableOpacity>
-              </View>
+                </CloseBtn>
+              </HeaderRow>
 
-              <View className="items-center mb-5">
-                <Text className="text-xs text-gray-400 font-bold uppercase tracking-wide">Valor a pagar</Text>
-                <Text className="text-4xl font-extrabold text-gray-900 mt-1">{fmt(amount)}</Text>
-              </View>
+              {/* Valor */}
+              <AmountBox>
+                <AmountLabel>Valor a pagar</AmountLabel>
+                <AmountValue>{fmt(amount)}</AmountValue>
+              </AmountBox>
 
-              <View className="flex-row justify-center mb-5">
-                <View className="p-4 bg-white border-2 border-gray-100 rounded-2xl">
-                  <QRCodeMock seed={pixKey + String(amount)} />
-                </View>
-              </View>
+              {/* QR Code Real */}
+              <QRWrapper>
+                <QRBorder>
+                  <QRCodePix
+                    value={emvCode}
+                    size={180}
+                    backgroundColor="#FFFFFF"
+                    color="#111318"
+                  />
+                </QRBorder>
+              </QRWrapper>
 
-              <View className="bg-gray-50 rounded-2xl p-4 mb-3">
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1">
-                    <Text className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Chave Pix</Text>
-                    <Text className="text-sm font-extrabold text-gray-800 mt-0.5" numberOfLines={1}>{pixKey}</Text>
-                    <Text className="text-xs text-gray-400 mt-0.5" numberOfLines={1}>{pixName} · {pixCity}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => copy(pixKey, "key")}
-                    className="flex-row items-center gap-1.5 px-3 py-2 bg-white rounded-xl border border-gray-200"
-                  >
-                    <Copy size={14} color="#4B5563" />
-                    <Text className="text-xs font-bold text-gray-600">
+              {/* Chave Pix */}
+              <InfoCard>
+                <InfoRow>
+                  <InfoContent>
+                    <InfoLabel>Chave Pix</InfoLabel>
+                    <InfoValue numberOfLines={1}>{pixKey}</InfoValue>
+                    <InfoSub numberOfLines={1}>{pixName} · {pixCity}</InfoSub>
+                  </InfoContent>
+                  <CopyBtn onPress={() => copy(pixKey, "key")} activeOpacity={0.7}>
+                    {copied === "key" ? (
+                      <Check size={14} color="#10B981" />
+                    ) : (
+                      <Copy size={14} color="#4B5563" />
+                    )}
+                    <CopyText $success={copied === "key"}>
                       {copied === "key" ? "Copiado!" : "Copiar Chave"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                    </CopyText>
+                  </CopyBtn>
+                </InfoRow>
+              </InfoCard>
 
-              <View className="bg-gray-50 rounded-2xl p-4 mb-5">
-                <Text className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-2">Copia e Cola</Text>
-                <View className="flex-row items-center gap-2">
-                  <Text className="flex-1 text-xs font-mono text-gray-500" numberOfLines={1}>{emvCode}</Text>
-                  <TouchableOpacity
-                    onPress={() => copy(emvCode, "code")}
-                    className="flex-row items-center gap-1.5 px-3 py-2 bg-white rounded-xl border border-gray-200"
-                  >
-                    <Copy size={14} color="#4B5563" />
-                    <Text className="text-xs font-bold text-gray-600">
+              {/* Copia e Cola */}
+              <InfoCard>
+                <InfoLabel>Copia e Cola</InfoLabel>
+                <CopyColRow>
+                  <EmvText numberOfLines={1}>{emvCode}</EmvText>
+                  <CopyBtn onPress={() => copy(emvCode, "code")} activeOpacity={0.7}>
+                    {copied === "code" ? (
+                      <Check size={14} color="#10B981" />
+                    ) : (
+                      <Copy size={14} color="#4B5563" />
+                    )}
+                    <CopyText $success={copied === "code"}>
                       {copied === "code" ? "Copiado!" : "Copiar"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                    </CopyText>
+                  </CopyBtn>
+                </CopyColRow>
+              </InfoCard>
 
-              <TouchableOpacity
-                onPress={onClose}
-                className="w-full py-4 bg-[#00C853] rounded-2xl shadow-lg shadow-green-500/25 items-center justify-center"
-              >
-                <Text className="text-white font-extrabold text-base">OK</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Botão OK */}
+              <OkButton onPress={onClose} activeOpacity={0.85}>
+                <OkText>OK</OkText>
+              </OkButton>
+            </Sheet>
           </TouchableWithoutFeedback>
-        </View>
+        </Backdrop>
       </TouchableWithoutFeedback>
     </Modal>
   );
 }
+
+// --- Styled Components ---
+
+const Backdrop = styled.View`
+  flex: 1;
+  background-color: rgba(0, 0, 0, 0.6);
+  justify-content: flex-end;
+`;
+
+const Sheet = styled.View`
+  background-color: #FFFFFF;
+  width: 100%;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 12px 20px 40px 20px;
+`;
+
+const Handle = styled.View`
+  width: 40px;
+  height: 4px;
+  background-color: #E5E7EB;
+  border-radius: 2px;
+  align-self: center;
+  margin-bottom: 20px;
+`;
+
+const HeaderRow = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
+const SheetTitle = styled.Text`
+  font-size: 20px;
+  font-weight: 800;
+  color: #111827;
+`;
+
+const CloseBtn = styled.TouchableOpacity`
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background-color: #F3F4F6;
+  align-items: center;
+  justify-content: center;
+`;
+
+const AmountBox = styled.View`
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
+const AmountLabel = styled.Text`
+  font-size: 11px;
+  color: #9CA3AF;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+const AmountValue = styled.Text`
+  font-size: 36px;
+  font-weight: 900;
+  color: #111827;
+  margin-top: 4px;
+`;
+
+const QRWrapper = styled.View`
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
+const QRBorder = styled.View`
+  padding: 16px;
+  background-color: #FFFFFF;
+  border-width: 2px;
+  border-color: #F3F4F6;
+  border-radius: 16px;
+`;
+
+const InfoCard = styled.View`
+  background-color: #F9FAFB;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+`;
+
+const InfoRow = styled.View`
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const InfoContent = styled.View`
+  flex: 1;
+`;
+
+const InfoLabel = styled.Text`
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+`;
+
+const InfoValue = styled.Text`
+  font-size: 14px;
+  font-weight: 800;
+  color: #1F2937;
+`;
+
+const InfoSub = styled.Text`
+  font-size: 12px;
+  color: #9CA3AF;
+  margin-top: 2px;
+`;
+
+const CopyBtn = styled.TouchableOpacity`
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border-width: 1px;
+  border-color: #E5E7EB;
+`;
+
+const CopyText = styled.Text<{ $success: boolean }>`
+  font-size: 12px;
+  font-weight: 700;
+  color: ${({ $success }) => ($success ? "#10B981" : "#4B5563")};
+`;
+
+const CopyColRow = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+`;
+
+const EmvText = styled.Text`
+  flex: 1;
+  font-size: 12px;
+  color: #6B7280;
+  font-family: monospace;
+`;
+
+const OkButton = styled.TouchableOpacity`
+  width: 100%;
+  padding: 16px 0;
+  background-color: #10B981;
+  border-radius: 16px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+
+  shadow-color: #10B981;
+  shadow-offset: 0px 6px;
+  shadow-opacity: 0.25;
+  shadow-radius: 12px;
+  elevation: 4;
+`;
+
+const OkText = styled.Text`
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 16px;
+`;

@@ -7,13 +7,14 @@ import {
   User,
 } from "lucide-react-native";
 import React, { useState } from "react";
-import { View } from "react-native";
+import { View, Share, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
 import { PixModal } from "../components/PixModal";
 import { useAppContext } from "../context/AppContext";
 import { Allocations, Profile } from "../types";
+import { generatePixBRCode } from "../utils/pix";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
@@ -56,7 +57,7 @@ export default function SummaryScreen() {
   const others = profiles.filter((p) => p.id !== payerId);
   const owingTotal = others.reduce((s, p) => s + (shares[p.id] ?? 0), 0);
 
-  const saveToHistoryAndClose = () => {
+  const saveToHistory = () => {
     if (payer) {
       const newEntry = {
         id: `h${Date.now()}`,
@@ -69,6 +70,43 @@ export default function SummaryScreen() {
       };
       setHistoryEntries([newEntry, ...historyEntries].slice(0, 3));
     }
+  };
+
+  const shareAndClose = async () => {
+    if (!payer) return;
+
+    saveToHistory();
+
+    const pixKey = payer.pixKey || "";
+    const pixName = payer.pixName || payer.name;
+    const pixCity = payer.pixCity || "São Paulo";
+    const emvCode = pixKey
+      ? generatePixBRCode(pixKey, owingTotal, pixName, pixCity)
+      : "";
+
+    const debtLines = others
+      .map((o) => `• ${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
+      .join("\n");
+
+    const message = [
+      `💰 Rateio Concluído!`,
+      `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
+      `Pagador: ${payer.name}`,
+      ``,
+      debtLines,
+      ``,
+      pixKey ? `📋 Pix Copia e Cola:` : "",
+      pixKey ? emvCode : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      await Share.share({ message });
+    } catch (e) {
+      // usuário cancelou o compartilhamento, tudo bem
+    }
+
     router.replace("/(tabs)/");
   };
 
@@ -183,13 +221,13 @@ export default function SummaryScreen() {
         <ButtonRow>
           <ActionButton
             disabled={!payerId}
-            onPress={saveToHistoryAndClose}
+            onPress={shareAndClose}
             $variant={payerId ? "dark" : "disabled"}
             activeOpacity={0.8}
           >
             <Share2 size={18} color={payerId ? "#FFFFFF" : "#A1A1AA"} />
             <ActionText $variant={payerId ? "dark" : "disabled"}>
-              Concluir
+              Compartilhar
             </ActionText>
           </ActionButton>
 

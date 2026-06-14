@@ -1,25 +1,187 @@
 import { router } from "expo-router";
-import { QrCode } from "lucide-react-native";
-import React from "react";
+import { QrCode, X } from "lucide-react-native";
+import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { WebView } from "react-native-webview";
+import { ActivityIndicator, View, Alert, TouchableOpacity } from "react-native";
 
 export default function MainScreen() {
-  const { profiles, loadMockData, items } = useAppContext();
+  const { profiles, loadMockData, items, setItems } = useAppContext();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannedUrl, setScannedUrl] = useState<string | null>(null);
 
-  const onScan = () => {
-    if (items.length > 0) {
-      router.push("/processing");
-    } else {
-      loadMockData();
-      setTimeout(() => router.push("/processing"), 500);
+  const onScan = async () => {
+    if (!permission?.granted) {
+      const { granted } = await requestPermission();
+      if (!granted) return;
+    }
+    setIsScanning(true);
+  };
+
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (data.startsWith("http")) {
+      setIsScanning(false);
+      setScannedUrl(data);
     }
   };
 
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === "ITEMS_FOUND") {
+        if (msg.data.length > 0) {
+          setItems(msg.data);
+          setScannedUrl(null);
+          router.push("/processing");
+        } else {
+          Alert.alert("Aviso", "Nenhum produto encontrado nesta nota fiscal. O formato pode não ser suportado.");
+          setScannedUrl(null);
+        }
+      } else if (msg.type === "ERROR") {
+        Alert.alert("Erro de Leitura", "Falha ao ler os produtos: " + msg.message);
+        setScannedUrl(null);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Erro", "Ocorreu um erro ao processar os dados da nota.");
+      setScannedUrl(null);
+    }
+  };
+
+  const INJECTED_JS = `
+    setTimeout(() => {
+      try {
+        const items = [];
+        let idCounter = 1;
+        
+        // Formato atual (MG e outros estados que usam o mesmo sistema)
+        const rows = document.querySelectorAll('tr');
+        rows.forEach(row => {
+          const text = row.innerText.replace(/\\s+/g, ' ').trim();
+          const match = text.match(/(.*?)\\s*\\(C[oó]digo:.*?\\).*?Qtde.*?:\\s*([0-9.,]+)\\s*UN:\\s*([A-Za-z]+).*?(?:Valor|Vl).*?:\\s*R\\$\\s*([0-9.,]+)/i);
+          
+          if (match) {
+            const name = match[1].trim();
+            const qtyRaw = parseFloat(match[2].replace(',', '.'));
+            const unitMeasure = match[3].toUpperCase();
+            const totalPriceRaw = match[4].replace(/\\./g, '').replace(',', '.');
+            const totalPrice = parseFloat(totalPriceRaw);
+            
+            let finalQty = 1;
+            let finalUnitPrice = totalPrice;
+
+            // Se for unidade exata (UN, CX, PT) e for um número inteiro, 
+            // rateamos a quantidade. Caso contrário (KG, L ou quantidade quebrada), 
+            // tratamos como "1 pacote" daquele peso no valor total.
+            if (Number.isInteger(qtyRaw) && qtyRaw > 0 && unitMeasure !== 'KG' && unitMeasure !== 'L') {
+              finalQty = qtyRaw;
+              finalUnitPrice = totalPrice / qtyRaw;
+            }
+            
+            items.push({
+              id: 'item_' + Date.now() + '_' + idCounter++,
+              name: name + (unitMeasure === 'KG' ? ' (Peso)' : ''),
+              totalUnits: finalQty,
+              unitPrice: finalUnitPrice
+            });
+          }
+        });
+        
+        // Fallback para formato antigo (txtTit2)
+        if (items.length === 0) {
+          const nameElements = document.querySelectorAll('.txtTit2');
+          nameElements.forEach(nameEl => {
+            const name = nameEl.innerText.trim();
+            let currentEl = nameEl.closest('tr') || nameEl.parentElement;
+            
+            let qty = 1;
+            let unitPrice = 0;
+            
+            for (let i = 0; i < 5; i++) {
+              currentEl = currentEl.nextElementSibling;
+              if (!currentEl) break;
+              
+              const text = currentEl.innerText || '';
+              if (text.includes('Qtde') || text.includes('Vl. Unit')) {
+                const qMatch = text.match(/(?:Qtde|Qtd).*?([0-9]+,[0-9]+)/i);
+                const pMatch = text.match(/(?:Vl.*?Unit).*?([0-9]+,[0-9]+)/i);
+                
+                if (qMatch) qty = parseFloat(qMatch[1].replace(',', '.'));
+                if (pMatch) unitPrice = parseFloat(pMatch[1].replace(',', '.'));
+                break;
+              }
+            }
+            
+            if (unitPrice > 0) {
+              items.push({
+                id: 'item_' + Date.now() + '_' + idCounter++,
+                name: name,
+                totalUnits: Math.max(1, Math.round(qty)),
+                unitPrice: unitPrice
+              });
+            }
+          });
+        }
+        
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ITEMS_FOUND', data: items }));
+      } catch(err) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: err.toString() }));
+      }
+    }, 4000); // Aumentado para 4s para garantir que o portal carregue
+    true;
+  `;
+
+  if (isScanning) {
+    return (
+      <Container>
+        <CameraView
+          style={{ flex: 1 }}
+          onBarcodeScanned={scannedUrl ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+        >
+          <CameraOverlay>
+            <CloseCameraButton onPress={() => setIsScanning(false)}>
+              <X size={24} color="#FFFFFF" />
+            </CloseCameraButton>
+            <ScanArea />
+            <ScanText>Aponte para o QR Code da nota fiscal</ScanText>
+          </CameraOverlay>
+        </CameraView>
+      </Container>
+    );
+  }
+
   return (
     <Container>
+      {scannedUrl && (
+        <View style={{ position: "absolute", zIndex: 100, width: "100%", height: "100%", backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#10B981" />
+          <ScanText style={{ color: "#18181B", marginTop: 16 }}>Processando nota fiscal...</ScanText>
+          <TouchableOpacity 
+            onPress={() => setScannedUrl(null)} 
+            style={{ marginTop: 24, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: "#F4F4F5", borderRadius: 12 }}
+            activeOpacity={0.7}
+          >
+             <ScanText style={{ color: "#52525B", fontSize: 14 }}>Cancelar Leitura</ScanText>
+          </TouchableOpacity>
+          <View style={{ height: 0, width: 0, opacity: 0 }}>
+            <WebView 
+              source={{ uri: scannedUrl }} 
+              injectedJavaScript={INJECTED_JS}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled
+            />
+          </View>
+        </View>
+      )}
+
       <ScrollContent showsVerticalScrollIndicator={false}>
         
         {/* Cabeçalho */}
@@ -272,4 +434,40 @@ const ProfileName = styled.Text`
   font-weight: 700;
   color: #52525B;
   max-width: 80px;
+`;
+
+const CameraOverlay = styled.View`
+  flex: 1;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+`;
+
+const CloseCameraButton = styled.TouchableOpacity`
+  position: absolute;
+  top: 64px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+`;
+
+const ScanArea = styled.View`
+  width: 250px;
+  height: 250px;
+  border-width: 2px;
+  border-color: #10B981;
+  background-color: transparent;
+  border-radius: 24px;
+  margin-bottom: 24px;
+`;
+
+const ScanText = styled.Text`
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-align: center;
 `;

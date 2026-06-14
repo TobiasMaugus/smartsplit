@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Profile, GroceryItem, Allocations, HistoryEntry } from "../types";
 
 interface AppContextType {
@@ -14,6 +15,7 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+const HISTORY_KEY = "@app:history";
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -21,11 +23,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allocs, setAllocs] = useState<Allocations>({});
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
 
+  // Carrega histórico ao iniciar
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(HISTORY_KEY);
+        if (stored) {
+          setHistoryEntries(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Failed to load history", e);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  // Salva histórico sempre que for atualizado
+  useEffect(() => {
+    const saveHistory = async () => {
+      try {
+        await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(historyEntries));
+      } catch (e) {
+        console.error("Failed to save history", e);
+      }
+    };
+    saveHistory();
+  }, [historyEntries]);
+
   const loadMockData = () => {
     import("../mockData").then((mock) => {
       setProfiles(mock.MOCK_PROFILES);
       setItems(mock.MOCK_ITEMS);
-      setHistoryEntries(mock.MOCK_HISTORY);
     });
   };
 
