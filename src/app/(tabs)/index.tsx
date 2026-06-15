@@ -1,13 +1,13 @@
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { QrCode, X } from "lucide-react-native";
 import React, { useState } from "react";
+import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import styled from "styled-components/native";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { WebView } from "react-native-webview";
-import { ActivityIndicator, View, Alert, TouchableOpacity } from "react-native";
 
 export default function MainScreen() {
   const { profiles, loadMockData, items, setItems } = useAppContext();
@@ -39,11 +39,17 @@ export default function MainScreen() {
           setScannedUrl(null);
           router.push("/processing");
         } else {
-          Alert.alert("Aviso", "Nenhum produto encontrado nesta nota fiscal. O formato pode não ser suportado.");
+          Alert.alert(
+            "Aviso",
+            "Nenhum produto encontrado nesta nota fiscal. O formato pode não ser suportado.",
+          );
           setScannedUrl(null);
         }
       } else if (msg.type === "ERROR") {
-        Alert.alert("Erro de Leitura", "Falha ao ler os produtos: " + msg.message);
+        Alert.alert(
+          "Erro de Leitura",
+          "Falha ao ler os produtos: " + msg.message,
+        );
         setScannedUrl(null);
       }
     } catch (e) {
@@ -161,19 +167,39 @@ export default function MainScreen() {
   return (
     <Container>
       {scannedUrl && (
-        <View style={{ position: "absolute", zIndex: 100, width: "100%", height: "100%", backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{
+            position: "absolute",
+            zIndex: 100,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(255,255,255,0.9)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <ActivityIndicator size="large" color="#10B981" />
-          <ScanText style={{ color: "#18181B", marginTop: 16 }}>Processando nota fiscal...</ScanText>
-          <TouchableOpacity 
-            onPress={() => setScannedUrl(null)} 
-            style={{ marginTop: 24, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: "#F4F4F5", borderRadius: 12 }}
+          <ScanText style={{ color: "#18181B", marginTop: 16 }}>
+            Processando nota fiscal...
+          </ScanText>
+          <TouchableOpacity
+            onPress={() => setScannedUrl(null)}
+            style={{
+              marginTop: 24,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              backgroundColor: "#F4F4F5",
+              borderRadius: 12,
+            }}
             activeOpacity={0.7}
           >
-             <ScanText style={{ color: "#52525B", fontSize: 14 }}>Cancelar Leitura</ScanText>
+            <ScanText style={{ color: "#52525B", fontSize: 14 }}>
+              Cancelar Leitura
+            </ScanText>
           </TouchableOpacity>
           <View style={{ height: 0, width: 0, opacity: 0 }}>
-            <WebView 
-              source={{ uri: scannedUrl }} 
+            <WebView
+              source={{ uri: scannedUrl }}
               injectedJavaScript={INJECTED_JS}
               onMessage={handleWebViewMessage}
               javaScriptEnabled
@@ -183,7 +209,6 @@ export default function MainScreen() {
       )}
 
       <ScrollContent showsVerticalScrollIndicator={false}>
-        
         {/* Cabeçalho */}
         <Header>
           <HeaderTextGroup>
@@ -200,7 +225,7 @@ export default function MainScreen() {
             <IconWrapper>
               <QrCode size={44} color="#FFFFFF" />
             </IconWrapper>
-            
+
             <CardTextGroup>
               <CardTitle>Ler Nota Fiscal</CardTitle>
               <CardDescription>
@@ -212,8 +237,6 @@ export default function MainScreen() {
               <PrimaryButtonText>Ler Nota Fiscal</PrimaryButtonText>
             </PrimaryButton>
           </MainCard>
-
-
         </CenterArea>
 
         {/* Rodapé (Perfis Ativos) */}
@@ -230,7 +253,6 @@ export default function MainScreen() {
             ))}
           </ProfilesRow>
         </Footer>
-
       </ScrollContent>
     </Container>
   );
@@ -240,7 +262,7 @@ export default function MainScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
 `;
 
 const ScrollContent = styled.ScrollView.attrs({
@@ -269,32 +291,17 @@ const HeaderTextGroup = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
   letter-spacing: -0.5px;
   line-height: 38px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717A;
+  color: #71717a;
   margin-top: 8px;
   font-weight: 500;
   line-height: 22px;
-`;
-
-const MockButton = styled.TouchableOpacity`
-  background-color: #E4E4E7;
-  padding-horizontal: 12px;
-  padding-vertical: 6px;
-  border-radius: 8px;
-  margin-top: 6px;
-`;
-
-const MockButtonText = styled.Text`
-  font-size: 11px;
-  font-weight: 800;
-  color: #52525B;
-  text-transform: uppercase;
 `;
 
 const CenterArea = styled.View`
@@ -304,13 +311,13 @@ const CenterArea = styled.View`
 `;
 
 const MainCard = styled.View`
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 24px;
   padding: 32px 24px;
   align-items: center;
   border-width: 1px;
-  border-color: #F4F4F5;
-  
+  border-color: #f4f4f5;
+
   shadow-color: #000;
   shadow-offset: 0px 8px;
   shadow-opacity: 0.06;
@@ -322,12 +329,12 @@ const IconWrapper = styled.View`
   width: 88px;
   height: 88px;
   border-radius: 28px;
-  background-color: #10B981;
+  background-color: #10b981;
   align-items: center;
   justify-content: center;
   margin-bottom: 24px;
-  
-  shadow-color: #10B981;
+
+  shadow-color: #10b981;
   shadow-offset: 0px 8px;
   shadow-opacity: 0.3;
   shadow-radius: 12px;
@@ -343,13 +350,13 @@ const CardTextGroup = styled.View`
 const CardTitle = styled.Text`
   font-size: 20px;
   font-weight: 800;
-  color: #18181B;
+  color: #18181b;
   margin-bottom: 8px;
 `;
 
 const CardDescription = styled.Text`
   font-size: 14px;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-align: center;
   line-height: 20px;
   font-weight: 500;
@@ -358,12 +365,12 @@ const CardDescription = styled.Text`
 const PrimaryButton = styled.TouchableOpacity`
   width: 100%;
   padding-vertical: 18px;
-  background-color: #10B981;
+  background-color: #10b981;
   border-radius: 16px;
   align-items: center;
   justify-content: center;
-  
-  shadow-color: #10B981;
+
+  shadow-color: #10b981;
   shadow-offset: 0px 6px;
   shadow-opacity: 0.25;
   shadow-radius: 12px;
@@ -373,7 +380,7 @@ const PrimaryButton = styled.TouchableOpacity`
 const PrimaryButtonText = styled.Text`
   font-weight: 800;
   font-size: 16px;
-  color: #FFFFFF;
+  color: #ffffff;
   letter-spacing: 0.3px;
 `;
 
@@ -382,12 +389,12 @@ const SecondaryButton = styled.TouchableOpacity`
   align-items: center;
   justify-content: center;
   padding-vertical: 16px;
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 16px;
   border-width: 1px;
-  border-color: #E4E4E7;
+  border-color: #e4e4e7;
   gap: 8px;
-  
+
   shadow-color: #000;
   shadow-offset: 0px 2px;
   shadow-opacity: 0.03;
@@ -398,7 +405,7 @@ const SecondaryButton = styled.TouchableOpacity`
 const SecondaryButtonText = styled.Text`
   font-weight: 700;
   font-size: 15px;
-  color: #52525B;
+  color: #52525b;
 `;
 
 const Footer = styled.View`
@@ -409,7 +416,7 @@ const Footer = styled.View`
 const FooterLabel = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #D4D4D8;
+  color: #d4d4d8;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 16px;
@@ -432,7 +439,7 @@ const ProfileBadge = styled.View`
 const ProfileName = styled.Text`
   font-size: 14px;
   font-weight: 700;
-  color: #52525B;
+  color: #52525b;
   max-width: 80px;
 `;
 
@@ -459,7 +466,7 @@ const ScanArea = styled.View`
   width: 250px;
   height: 250px;
   border-width: 2px;
-  border-color: #10B981;
+  border-color: #10b981;
   background-color: transparent;
   border-radius: 24px;
   margin-bottom: 24px;
@@ -468,6 +475,6 @@ const ScanArea = styled.View`
 const ScanText = styled.Text`
   font-size: 16px;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
   text-align: center;
 `;

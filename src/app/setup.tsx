@@ -65,13 +65,8 @@ export default function SetupScreen() {
     <Container>
       <KeyboardWrapper behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollContent showsVerticalScrollIndicator={false}>
-          
           <Header>
             <Title>Crie seus{"\n"}Perfis</Title>
-            <Subtitle>
-              Adicione você e sua namorada/o para começar a dividir as compras
-              automaticamente.
-            </Subtitle>
           </Header>
 
           {forms.map((form, i) => (
@@ -83,7 +78,7 @@ export default function SetupScreen() {
                     {form.name ? getInitials(form.name) : (i + 1).toString()}
                   </AvatarText>
                 </AvatarCircle>
-                
+
                 <InputContainer>
                   <Label>Nome</Label>
                   <StyledInput
@@ -130,7 +125,11 @@ export default function SetupScreen() {
                   {(
                     [
                       ["pixKey", "Chave Pix", "CPF, e-mail, telefone ou chave"],
-                      ["pixName", "Nome do Titular", "Nome completo do titular"],
+                      [
+                        "pixName",
+                        "Nome do Titular",
+                        "Nome completo do titular",
+                      ],
                       ["pixCity", "Cidade do Titular", "Sua cidade"],
                     ] as const
                   ).map(([k, label, ph]) => (
@@ -148,7 +147,7 @@ export default function SetupScreen() {
               )}
             </Card>
           ))}
-          
+
           {/* Espaçamento extra no fim do scroll */}
           <Spacing />
         </ScrollContent>
@@ -160,9 +159,7 @@ export default function SetupScreen() {
             $isActive={canGo}
             activeOpacity={0.85}
           >
-            <SubmitButtonText $isActive={canGo}>
-              Salvar Perfis
-            </SubmitButtonText>
+            <SubmitButtonText $isActive={canGo}>Salvar Perfis</SubmitButtonText>
           </SubmitButton>
         </BottomContainer>
       </KeyboardWrapper>
@@ -174,7 +171,7 @@ export default function SetupScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
 `;
 
 const KeyboardWrapper = styled.KeyboardAvoidingView`
@@ -195,26 +192,26 @@ const Header = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
   line-height: 38px;
   letter-spacing: -0.5px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717A;
+  color: #71717a;
   margin-top: 12px;
   font-weight: 500;
   line-height: 22px;
 `;
 
 const Card = styled.View`
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 20px;
   padding: 24px;
   margin-bottom: 20px;
   border-width: 1px;
-  border-color: #F4F4F5;
+  border-color: #f4f4f5;
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.05;
@@ -239,7 +236,7 @@ const AvatarCircle = styled.View`
 
 const AvatarText = styled.Text`
   font-weight: 900;
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 22px;
 `;
 
@@ -251,7 +248,7 @@ const InputContainer = styled.View`
 const Label = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -260,13 +257,13 @@ const Label = styled.Text`
 
 const StyledInput = styled.TextInput`
   width: 100%;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
   border-radius: 12px;
   padding-vertical: 14px;
   padding-horizontal: 16px;
   font-size: 15px;
   font-weight: 600;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const Section = styled.View`
@@ -308,7 +305,7 @@ const PixToggle = styled.TouchableOpacity`
 const PixToggleText = styled.Text`
   font-size: 12px;
   font-weight: 800;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-left: 8px;
@@ -327,7 +324,7 @@ const BottomContainer = styled.View`
   padding-horizontal: 24px;
   padding-bottom: 40px;
   padding-top: 16px;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
 `;
 
 const SubmitButton = styled.TouchableOpacity<{ $isActive: boolean }>`
@@ -337,7 +334,7 @@ const SubmitButton = styled.TouchableOpacity<{ $isActive: boolean }>`
   align-items: center;
   justify-content: center;
   background-color: ${({ $isActive }) => ($isActive ? "#10B981" : "#E4E4E7")};
-  
+
   ${({ $isActive }) =>
     $isActive &&
     `
