@@ -171,39 +171,98 @@ export default function MainScreen() {
           style={{
             position: "absolute",
             zIndex: 100,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(255,255,255,0.9)",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(9, 9, 11, 0.7)", // Backdrop escuro moderno (zinc-950 com opacidade)
             alignItems: "center",
             justifyContent: "center",
+            padding: 24,
           }}
         >
-          <ActivityIndicator size="large" color="#10B981" />
-          <ScanText style={{ color: "#18181B", marginTop: 16 }}>
-            Processando nota fiscal...
-          </ScanText>
-          <TouchableOpacity
-            onPress={() => setScannedUrl(null)}
+          {/* Card do Modal Centralizado */}
+          <View
             style={{
-              marginTop: 24,
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              backgroundColor: "#F4F4F5",
-              borderRadius: 12,
+              backgroundColor: "#FFFFFF",
+              width: "100%",
+              maxWidth: 340, // Garante que não fique gigante em telas largas
+              borderRadius: 24,
+              padding: 32,
+              alignItems: "center",
+              justifyContent: "center",
+              // Sombras elegantes para dar profundidade (iOS & Android)
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+              elevation: 8,
             }}
-            activeOpacity={0.7}
           >
-            <ScanText style={{ color: "#52525B", fontSize: 14 }}>
-              Cancelar Leitura
-            </ScanText>
-          </TouchableOpacity>
-          <View style={{ height: 0, width: 0, opacity: 0 }}>
-            <WebView
-              source={{ uri: scannedUrl }}
-              injectedJavaScript={INJECTED_JS}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled
+            <ActivityIndicator
+              size="large"
+              color="#10B981"
+              style={{ transform: [{ scale: 1.2 }] }}
             />
+
+            <ScanText
+              style={{
+                color: "#18181B",
+                marginTop: 20,
+                fontSize: 16,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              Processando nota fiscal
+            </ScanText>
+
+            <ScanText
+              style={{
+                color: "#71717A",
+                marginTop: 6,
+                fontSize: 13,
+                textAlign: "center",
+                lineHeight: 18,
+              }}
+            >
+              Aguarde enquanto extraímos os produtos do cupom...
+            </ScanText>
+
+            {/* Botão de Cancelar Reformulado */}
+            <TouchableOpacity
+              onPress={() => setScannedUrl(null)}
+              style={{
+                marginTop: 28,
+                width: "100%",
+                height: 48, // Tamanho ideal para toque
+                backgroundColor: "#F4F4F5",
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: "#E4E4E7",
+              }}
+              activeOpacity={0.7}
+            >
+              <ScanText
+                style={{ color: "#EF4444", fontSize: 14, fontWeight: "600" }}
+              >
+                Cancelar Leitura
+              </ScanText>
+            </TouchableOpacity>
+
+            {/* WebView Invisível de processamento mantido intacto */}
+            <View
+              style={{ height: 0, width: 0, opacity: 0, position: "absolute" }}
+            >
+              <WebView
+                source={{ uri: scannedUrl }}
+                injectedJavaScript={INJECTED_JS}
+                onMessage={handleWebViewMessage}
+                javaScriptEnabled
+              />
+            </View>
           </View>
         </View>
       )}
