@@ -2,12 +2,13 @@ import { router } from "expo-router";
 import {
   ChevronLeft,
   QrCode,
+  Save,
   Share2,
   ShoppingBag,
   User,
 } from "lucide-react-native";
 import React, { useState } from "react";
-import { View, Share, Alert } from "react-native";
+import { Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
@@ -47,6 +48,7 @@ export default function SummaryScreen() {
     useAppContext();
   const [payerId, setPayerId] = useState<string | null>(null);
   const [showPix, setShowPix] = useState(false);
+  const [wasSavedToHistory, setWasSavedToHistory] = useState(false); // 🔥 Evita duplicar no histórico
 
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
@@ -57,25 +59,35 @@ export default function SummaryScreen() {
   const others = profiles.filter((p) => p.id !== payerId);
   const owingTotal = others.reduce((s, p) => s + (shares[p.id] ?? 0), 0);
 
-  const saveToHistory = () => {
-    if (payer) {
-      const newEntry = {
-        id: `h${Date.now()}`,
-        date: new Date().toLocaleDateString("pt-BR"),
-        total: PURCHASE_TOTAL,
-        payer,
-        desc: others
-          .map((o) => `${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
-          .join(", "),
-      };
-      setHistoryEntries([newEntry, ...historyEntries].slice(0, 3));
-    }
+  // 1. Função Centralizada de Salvamento
+  const checkAndSaveToHistory = (currentPayer: Profile) => {
+    if (wasSavedToHistory) return; // Se já salvou nesta sessão, não faz nada
+
+    const newEntry = {
+      id: `h${Date.now()}`,
+      date: new Date().toLocaleDateString("pt-BR"),
+      total: PURCHASE_TOTAL,
+      payer: currentPayer,
+      desc: others
+        .map((o) => `${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
+        .join(", "),
+    };
+    setHistoryEntries([newEntry, ...historyEntries].slice(0, 3));
+    setWasSavedToHistory(true); // Bloqueia novos salvamentos duplicados
   };
 
+  // 2. Ação: Salvar e Voltar direto
+  const handleSaveAndExit = () => {
+    if (!payer) return;
+    checkAndSaveToHistory(payer);
+    router.replace("/(tabs)/");
+  };
+
+  // 3. Ação: Compartilhar
   const shareAndClose = async () => {
     if (!payer) return;
 
-    saveToHistory();
+    checkAndSaveToHistory(payer); // Salva no histórico ao compartilhar
 
     const pixKey = payer.pixKey || "";
     const pixName = payer.pixName || payer.name;
@@ -104,10 +116,17 @@ export default function SummaryScreen() {
     try {
       await Share.share({ message });
     } catch (e) {
-      // usuário cancelou o compartilhamento, tudo bem
+      // Usuário cancelou o compartilhamento
     }
 
     router.replace("/(tabs)/");
+  };
+
+  // 4. Ação: Gerar Pix
+  const handleOpenPix = () => {
+    if (!payer) return;
+    checkAndSaveToHistory(payer); // Salva no histórico ao gerar Pix
+    setShowPix(true);
   };
 
   return (
@@ -140,7 +159,10 @@ export default function SummaryScreen() {
             {profiles.map((p) => (
               <PayerButton
                 key={p.id}
-                onPress={() => setPayerId(p.id)}
+                onPress={() => {
+                  setPayerId(p.id);
+                  setWasSavedToHistory(false); // Reseta a trava caso mude o pagador antes de fechar
+                }}
                 activeOpacity={0.7}
                 $isActive={payerId === p.id}
               >
@@ -154,51 +176,61 @@ export default function SummaryScreen() {
 
         {/* Detalhes do Rateio */}
         {payerId && (
-          <Card>
-            <CardLabel style={{ marginBottom: 16 }}>Rateio</CardLabel>
-            <BreakdownList>
-              {profiles.map((p) => (
-                <BreakdownItem key={p.id}>
-                  <Avatar name={p.name} color={p.color} size="xs" />
-                  <BreakdownInfo>
-                    <BreakdownHeader>
-                      <BreakdownName>
-                        {p.name.split(" ")[0]}
-                        {p.id === payerId ? " (pagou)" : ""}
-                      </BreakdownName>
-                      <BreakdownValue>{fmt(shares[p.id] ?? 0)}</BreakdownValue>
-                    </BreakdownHeader>
-                    <ProgressBarBox>
-                      <ProgressBarFill
-                        style={{
-                          width: `${((shares[p.id] ?? 0) / Math.max(1, PURCHASE_TOTAL)) * 100}%`,
-                          backgroundColor: p.color,
-                        }}
-                      />
-                    </ProgressBarBox>
-                  </BreakdownInfo>
-                </BreakdownItem>
-              ))}
-            </BreakdownList>
+          <View style={{ gap: 16 }}>
+            <Card style={{ marginBottom: 0 }}>
+              <CardLabel style={{ marginBottom: 16 }}>Rateio</CardLabel>
+              <BreakdownList>
+                {profiles.map((p) => (
+                  <BreakdownItem key={p.id}>
+                    <Avatar name={p.name} color={p.color} size="xs" />
+                    <BreakdownInfo>
+                      <BreakdownHeader>
+                        <BreakdownName>
+                          {p.name.split(" ")[0]}
+                          {p.id === payerId ? " (pagou)" : ""}
+                        </BreakdownName>
+                        <BreakdownValue>
+                          {fmt(shares[p.id] ?? 0)}
+                        </BreakdownValue>
+                      </BreakdownHeader>
+                      <ProgressBarBox>
+                        <ProgressBarFill
+                          style={{
+                            width: `${((shares[p.id] ?? 0) / Math.max(1, PURCHASE_TOTAL)) * 100}%`,
+                            backgroundColor: p.color,
+                          }}
+                        />
+                      </ProgressBarBox>
+                    </BreakdownInfo>
+                  </BreakdownItem>
+                ))}
+              </BreakdownList>
 
-            <Divider />
+              <Divider />
 
-            <OwningBox>
-              {others.length > 0 ? (
-                others.map((o) => (
-                  <OwningItem key={o.id}>
-                    <OwningUser>
-                      <Avatar name={o.name} color={o.color} size="xs" />
-                      <OwningText>{o.name.split(" ")[0]} te deve</OwningText>
-                    </OwningUser>
-                    <OwningValue>{fmt(shares[o.id] ?? 0)}</OwningValue>
-                  </OwningItem>
-                ))
-              ) : (
-                <EmptyOwning>Nenhum valor a receber</EmptyOwning>
-              )}
-            </OwningBox>
-          </Card>
+              <OwningBox>
+                {others.length > 0 ? (
+                  others.map((o) => (
+                    <OwningItem key={o.id}>
+                      <OwningUser>
+                        <Avatar name={o.name} color={o.color} size="xs" />
+                        <OwningText>{o.name.split(" ")[0]} te deve</OwningText>
+                      </OwningUser>
+                      <OwningValue>{fmt(shares[o.id] ?? 0)}</OwningValue>
+                    </OwningItem>
+                  ))
+                ) : (
+                  <EmptyOwning>Nenhum valor a receber</EmptyOwning>
+                )}
+              </OwningBox>
+            </Card>
+
+            {/* 🔥 NOVO BOTÃO: Salvar e Voltar */}
+            <InlineSaveButton onPress={handleSaveAndExit} activeOpacity={0.85}>
+              <Save size={18} color="#10B981" />
+              <InlineSaveText>Salvar e Voltar</InlineSaveText>
+            </InlineSaveButton>
+          </View>
         )}
 
         {/* Placeholder caso não haja pagador */}
@@ -233,7 +265,7 @@ export default function SummaryScreen() {
 
           <ActionButton
             disabled={!payerId}
-            onPress={() => payerId && setShowPix(true)}
+            onPress={handleOpenPix}
             $variant={payerId ? "primary" : "disabled"}
             activeOpacity={0.8}
           >
@@ -261,7 +293,7 @@ export default function SummaryScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
 `;
 
 const Header = styled.View`
@@ -278,20 +310,20 @@ const BackButton = styled.TouchableOpacity`
 const BackText = styled.Text`
   font-size: 15px;
   font-weight: 600;
-  color: #A1A1AA;
+  color: #a1a1aa;
 `;
 
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
   letter-spacing: -0.5px;
   line-height: 38px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717A;
+  color: #71717a;
   margin-top: 4px;
   font-weight: 500;
 `;
@@ -306,14 +338,14 @@ const ScrollContent = styled.ScrollView.attrs({
 `;
 
 const TotalCard = styled.View`
-  background-color: #18181B;
+  background-color: #18181b;
   border-radius: 24px;
   padding: 24px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
-  
+
   shadow-color: #000;
   shadow-offset: 0px 8px;
   shadow-opacity: 0.15;
@@ -323,7 +355,7 @@ const TotalCard = styled.View`
 
 const TotalLabel = styled.Text`
   font-size: 11px;
-  color: #A1A1AA;
+  color: #a1a1aa;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -332,7 +364,7 @@ const TotalLabel = styled.Text`
 const TotalValue = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #FFFFFF;
+  color: #ffffff;
   margin-top: 4px;
 `;
 
@@ -346,13 +378,13 @@ const TotalIconBox = styled.View`
 `;
 
 const Card = styled.View`
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 24px;
   padding: 20px;
   margin-bottom: 16px;
   border-width: 1px;
-  border-color: #F4F4F5;
-  
+  border-color: #f4f4f5;
+
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -363,7 +395,7 @@ const Card = styled.View`
 const CardLabel = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -381,7 +413,7 @@ const PayerButton = styled.TouchableOpacity<{ $isActive: boolean }>`
   padding-vertical: 20px;
   border-radius: 20px;
   border-width: 2px;
-  
+
   ${({ $isActive }) =>
     $isActive
       ? `
@@ -397,13 +429,13 @@ const PayerButton = styled.TouchableOpacity<{ $isActive: boolean }>`
 const PayerName = styled.Text`
   font-size: 15px;
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const PayerStatus = styled.Text`
   font-size: 12px;
   font-weight: 800;
-  color: #10B981;
+  color: #10b981;
 `;
 
 const BreakdownList = styled.View`
@@ -429,18 +461,18 @@ const BreakdownHeader = styled.View`
 const BreakdownName = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const BreakdownValue = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const ProgressBarBox = styled.View`
   height: 8px;
-  background-color: #F4F4F5;
+  background-color: #f4f4f5;
   border-radius: 4px;
   overflow: hidden;
 `;
@@ -452,12 +484,12 @@ const ProgressBarFill = styled.View`
 
 const Divider = styled.View`
   height: 1px;
-  background-color: #F4F4F5;
+  background-color: #f4f4f5;
   margin-vertical: 16px;
 `;
 
 const OwningBox = styled.View`
-  background-color: #ECFDF5;
+  background-color: #ecfdf5;
   border-radius: 16px;
   padding: 16px;
   gap: 12px;
@@ -478,47 +510,73 @@ const OwningUser = styled.View`
 const OwningText = styled.Text`
   font-size: 14px;
   font-weight: 600;
-  color: #3F3F46;
+  color: #3f3f46;
 `;
 
 const OwningValue = styled.Text`
   font-size: 16px;
   font-weight: 900;
-  color: #10B981;
+  color: #10b981;
 `;
 
 const EmptyOwning = styled.Text`
   font-size: 14px;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-align: center;
   font-weight: 500;
 `;
 
 const EmptyPayerBox = styled.View`
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 24px;
   padding: 20px;
   flex-direction: row;
   align-items: center;
   gap: 16px;
   border-width: 1px;
-  border-color: #F4F4F5;
+  border-color: #f4f4f5;
 `;
 
 const EmptyPayerIcon = styled.View`
   width: 44px;
   height: 44px;
   border-radius: 22px;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
   align-items: center;
   justify-content: center;
 `;
 
 const EmptyPayerText = styled.Text`
   font-size: 14px;
-  color: #A1A1AA;
+  color: #a1a1aa;
   font-weight: 500;
   flex: 1;
+`;
+
+// 🔥 Novos estilos do botão "Salvar e Voltar" alinhado ao design limpo do app
+const InlineSaveButton = styled.TouchableOpacity`
+  background-color: #ffffff;
+  border-width: 1px;
+  border-color: #e4e4e7;
+  border-radius: 20px;
+  padding-vertical: 16px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  shadow-color: #000;
+  shadow-offset: 0px 2px;
+  shadow-opacity: 0.02;
+  shadow-radius: 4px;
+  elevation: 1;
+`;
+
+const InlineSaveText = styled.Text`
+  color: #18181b;
+  font-size: 15px;
+  font-weight: 800;
 `;
 
 const Spacing = styled.View`
@@ -527,9 +585,9 @@ const Spacing = styled.View`
 
 const BottomBar = styled.View`
   padding: 16px 24px 32px 24px;
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-top-width: 1px;
-  border-top-color: #F4F4F5;
+  border-top-color: #f4f4f5;
 `;
 
 const ButtonRow = styled.View`
@@ -537,7 +595,9 @@ const ButtonRow = styled.View`
   gap: 12px;
 `;
 
-const ActionButton = styled.TouchableOpacity<{ $variant: "primary" | "dark" | "disabled" }>`
+const ActionButton = styled.TouchableOpacity<{
+  $variant: "primary" | "dark" | "disabled";
+}>`
   flex: 1;
   padding-vertical: 18px;
   border-radius: 16px;
@@ -545,9 +605,10 @@ const ActionButton = styled.TouchableOpacity<{ $variant: "primary" | "dark" | "d
   align-items: center;
   justify-content: center;
   gap: 8px;
-  
+
   ${({ $variant }) => {
-    if ($variant === "primary") return `
+    if ($variant === "primary")
+      return `
       background-color: #10B981;
       shadow-color: #10B981;
       shadow-offset: 0px 6px;
@@ -555,7 +616,8 @@ const ActionButton = styled.TouchableOpacity<{ $variant: "primary" | "dark" | "d
       shadow-radius: 12px;
       elevation: 4;
     `;
-    if ($variant === "dark") return `
+    if ($variant === "dark")
+      return `
       background-color: #18181B;
       shadow-color: #000;
       shadow-offset: 0px 6px;

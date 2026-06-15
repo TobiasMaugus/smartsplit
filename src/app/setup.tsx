@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
@@ -35,7 +35,17 @@ export default function SetupScreen() {
           },
         ];
 
-  const [forms, setForms] = useState<ProfileForm[]>(initialForms);
+  const [forms, setForms] = useState<ProfileForm[]>([]);
+  useEffect(() => {
+    if (profiles && profiles.length >= 2) {
+      setForms(
+        profiles.map((p) => ({
+          ...p,
+          showPix: !!p.pixKey,
+        })),
+      );
+    }
+  }, [profiles]);
 
   const upd = (i: number, k: keyof ProfileForm, v: string | boolean) =>
     setForms((fs) => fs.map((f, j) => (j === i ? { ...f, [k]: v } : f)));

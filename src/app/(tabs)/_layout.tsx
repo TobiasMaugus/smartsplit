@@ -1,16 +1,8 @@
-import { Redirect, Tabs } from "expo-router";
+import { Tabs } from "expo-router";
 import { History, ShoppingBag, User } from "lucide-react-native";
-import { useAppContext } from "../../context/AppContext";
 import "../../global.css";
 
 export default function TabLayout() {
-  const { profiles } = useAppContext();
-
-  // Redirect to setup if not enough profiles
-  if (profiles.length < 2) {
-    return <Redirect href="/setup" />;
-  }
-
   return (
     <Tabs
       screenOptions={{

@@ -42,6 +42,7 @@ export default function ProcessingScreen() {
   const [personalizado, setPersonalizado] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  const [isScrollable, setIsScrollable] = useState(false);
 
   const cur = items[curIdx];
   const rem = cur ? (remaining[cur.id] ?? 0) : 0;
@@ -145,7 +146,9 @@ export default function ProcessingScreen() {
         <TopRow>
           <TotalText>Total: {fmt(PURCHASE_TOTAL)}</TotalText>
           <ProgressLabel>
-            {allDone ? "Concluído ✓" : `Item ${doneCount + 1} de ${items.length}`}
+            {allDone
+              ? "Concluído ✓"
+              : `Item ${doneCount + 1} de ${items.length}`}
           </ProgressLabel>
         </TopRow>
         <ProgressTrack>
@@ -153,23 +156,35 @@ export default function ProcessingScreen() {
         </ProgressTrack>
       </TopPanel>
 
-      <ScrollContent showsVerticalScrollIndicator={false}>
+      <ScrollContent
+        scrollEnabled={isScrollable} // Controla dinamicamente se o scroll funciona
+        alwaysBounceVertical={false}
+        bounces={false}
+        onContentSizeChange={(contentWidth, contentHeight) => {
+          // Se o conteúdo mudar (ex: mudou de produto), reavalia o tamanho
+          setIsScrollable(contentHeight > 550); // 550px é uma média segura da área útil da tela
+        }}
+        onLayout={(e) => {
+          // Se preferir uma precisão cirúrgica baseada no tamanho exato do layout do seu celular:
+          const layoutHeight = e.nativeEvent.layout.height;
+        }}
+      >
         {allDone ? (
           <DoneContainer>
             <DoneIconWrapper>
               <CheckCircle2 size={48} color="#10B981" />
             </DoneIconWrapper>
             <DoneTitle>Todos atribuídos!</DoneTitle>
-            <DoneSubtitle>
-              Clique em Finalizar para ver o resumo.
-            </DoneSubtitle>
+            <DoneSubtitle>Clique em Finalizar para ver o resumo.</DoneSubtitle>
           </DoneContainer>
         ) : (
-          <View style={{ gap: 16 }}>
+          <View style={{ gap: 18 }}>
+            {/* Otimizado de 16 para 12 */}
             {/* Produto Atual */}
-            <Card>
+            <Card style={{ paddingVertical: 16 }}>
+              {/* Reduzido padding vertical */}
               <CardLabel>Produto atual</CardLabel>
-              <ItemTitle>{cur?.name}</ItemTitle>
+              <ItemTitle numberOfLines={2}>{cur?.name}</ItemTitle>
               <ItemRow>
                 <ItemPrice>{fmt(cur?.unitPrice ?? 0)} / un.</ItemPrice>
                 <ItemRemaining>
@@ -177,21 +192,28 @@ export default function ProcessingScreen() {
                 </ItemRemaining>
               </ItemRow>
             </Card>
-
             {/* Quantidade */}
-            <Card>
-              <CardLabel style={{ marginBottom: 16 }}>Unidades a atribuir</CardLabel>
+            <Card style={{ paddingVertical: 16 }}>
+              {/* Reduzido padding vertical */}
+              <CardLabel style={{ marginBottom: 10 }}>
+                Unidades a atribuir
+              </CardLabel>
               <QtyContainer>
-                <QtyButton onPress={() => setQty(clamp(qty - 1))} activeOpacity={0.7}>
-                  <Minus size={22} color="#3F3F46" />
+                <QtyButton
+                  onPress={() => setQty(clamp(qty - 1))}
+                  activeOpacity={0.7}
+                >
+                  <Minus size={20} color="#3F3F46" />
                 </QtyButton>
                 <QtyValue>{Math.min(qty, rem)}</QtyValue>
-                <QtyButton onPress={() => setQty(clamp(qty + 1))} activeOpacity={0.7}>
-                  <Plus size={22} color="#3F3F46" />
+                <QtyButton
+                  onPress={() => setQty(clamp(qty + 1))}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={20} color="#3F3F46" />
                 </QtyButton>
               </QtyContainer>
             </Card>
-
             {/* Toggle Personalizado */}
             <ToggleCard>
               <ToggleTextGroup>
@@ -200,10 +222,11 @@ export default function ProcessingScreen() {
                   {personalizado ? "Multi-seleção ativa" : "Seleção individual"}
                 </ToggleSubtitle>
               </ToggleTextGroup>
-              <SwitchTrack 
+              <SwitchTrack
                 onPress={() => {
                   setPersonalizado((p) => !p);
                   setSelected([]);
+                  qty > rem ? setQty(clamp(qty)) : null;
                 }}
                 activeOpacity={1}
                 $isActive={personalizado}
@@ -211,10 +234,10 @@ export default function ProcessingScreen() {
                 <SwitchThumb $isActive={personalizado} />
               </SwitchTrack>
             </ToggleCard>
-
             {/* Atribuir Para */}
-            <Card>
-              <CardLabel style={{ marginBottom: 16 }}>Atribuir para</CardLabel>
+            <Card style={{ paddingVertical: 18 }}>
+              {/* Reduzido padding vertical */}
+              <CardLabel style={{ marginBottom: 12 }}>Atribuir para</CardLabel>
               <AvatarGrid>
                 {profiles.map((p) => {
                   const isSel = personalizado && selected.includes(p.id);
@@ -236,9 +259,15 @@ export default function ProcessingScreen() {
                 })}
 
                 {!personalizado && (
-                  <AvatarItem onPress={() => attribute(COLLECTIVE)} activeOpacity={0.7}>
-                    <AvatarCircle style={{ backgroundColor: "#27272A" }} $isSelected={false}>
-                      <Users size={24} color="#FFFFFF" />
+                  <AvatarItem
+                    onPress={() => attribute(COLLECTIVE)}
+                    activeOpacity={0.7}
+                  >
+                    <AvatarCircle
+                      style={{ backgroundColor: "#27272A" }}
+                      $isSelected={false}
+                    >
+                      <Users size={22} color="#FFFFFF" />
                     </AvatarCircle>
                     <AvatarLabel>
                       {profiles.length === 2 ? "Ambos" : "Todos"}
@@ -246,12 +275,15 @@ export default function ProcessingScreen() {
                   </AvatarItem>
                 )}
               </AvatarGrid>
-
               {personalizado && selected.length > 0 && (
-                <ConfirmButton onPress={confirmPersonalizado} activeOpacity={0.85}>
+                <ConfirmButton
+                  onPress={confirmPersonalizado}
+                  activeOpacity={0.85}
+                >
                   <CheckCircle2 size={18} color="#FFFFFF" />
                   <ConfirmText>
-                    Atribuir para {selected.length} perfil{selected.length > 1 ? "s" : ""}
+                    Atribuir para {selected.length} perfil
+                    {selected.length > 1 ? "s" : ""}
                   </ConfirmText>
                 </ConfirmButton>
               )}
@@ -275,7 +307,9 @@ export default function ProcessingScreen() {
             style={{ flex: 1 }}
           >
             <Undo2 size={18} color={undoStack.length ? "#3F3F46" : "#A1A1AA"} />
-            <ActionButtonText $variant={undoStack.length ? "default" : "disabled"}>
+            <ActionButtonText
+              $variant={undoStack.length ? "default" : "disabled"}
+            >
               Desfazer
             </ActionButtonText>
           </ActionButton>
@@ -287,9 +321,7 @@ export default function ProcessingScreen() {
             style={{ flex: 1 }}
           >
             <RotateCcw size={18} color="#3F3F46" />
-            <ActionButtonText $variant="default">
-              Reiniciar
-            </ActionButtonText>
+            <ActionButtonText $variant="default">Reiniciar</ActionButtonText>
           </ActionButton>
 
           {allDone && (
@@ -299,9 +331,7 @@ export default function ProcessingScreen() {
               activeOpacity={0.85}
               style={{ flex: 1 }}
             >
-              <ActionButtonText $variant="primary">
-                Finalizar
-              </ActionButtonText>
+              <ActionButtonText $variant="primary">Finalizar</ActionButtonText>
             </ActionButton>
           )}
         </ButtonRow>
@@ -310,18 +340,18 @@ export default function ProcessingScreen() {
   );
 }
 
-// --- Styled Components ---
+// --- Styled Components Modificados ---
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
 `;
 
 const TopPanel = styled.View`
-  background-color: #FFFFFF;
-  padding: 24px 24px 16px 24px;
+  background-color: #ffffff;
+  padding: 16px 24px 12px 24px; /* Reduzido padding superior de 24px/16px para 16px/12px */
   border-bottom-width: 1px;
-  border-bottom-color: #E4E4E7;
+  border-bottom-color: #e4e4e7;
   z-index: 10;
 `;
 
@@ -329,38 +359,38 @@ const TopRow = styled.View`
   flex-direction: row;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 12px;
+  margin-bottom: 8px; /* Reduzido de 12px */
 `;
 
 const TotalText = styled.Text`
-  font-size: 20px;
+  font-size: 19px; /* Ajuste sutil de 20px */
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const ProgressLabel = styled.Text`
-  font-size: 12px;
+  font-size: 15px; /* Ajuste sutil de 12px */
   font-weight: 800;
-  color: #A1A1AA;
+  color: #a1a1aa;
 `;
 
 const ProgressTrack = styled.View`
-  height: 8px;
-  background-color: #F4F4F5;
-  border-radius: 4px;
+  height: 7px; /* Reduzido de 8px */
+  background-color: #f4f4f5;
+  border-radius: 3px;
   overflow: hidden;
 `;
 
 const ProgressFill = styled.View`
   height: 100%;
-  background-color: #10B981;
-  border-radius: 4px;
+  background-color: #10b981;
+  border-radius: 3px;
 `;
 
 const ScrollContent = styled.ScrollView.attrs({
   contentContainerStyle: {
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 16 /* Reduzido de 24 para economizar espaço de entrada */,
   },
 })`
   flex: 1;
@@ -369,37 +399,37 @@ const ScrollContent = styled.ScrollView.attrs({
 const DoneContainer = styled.View`
   align-items: center;
   justify-content: center;
-  padding-vertical: 60px;
-  gap: 20px;
+  padding-vertical: 40px;
+  gap: 16px;
 `;
 
 const DoneIconWrapper = styled.View`
-  width: 96px;
-  height: 96px;
-  border-radius: 48px;
-  background-color: #ECFDF5;
+  width: 80px;
+  height: 80px;
+  border-radius: 40px;
+  background-color: #ecfdf5;
   align-items: center;
   justify-content: center;
 `;
 
 const DoneTitle = styled.Text`
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const DoneSubtitle = styled.Text`
   font-size: 14px;
-  color: #A1A1AA;
+  color: #a1a1aa;
   font-weight: 500;
 `;
 
 const Card = styled.View`
-  background-color: #FFFFFF;
-  border-radius: 24px;
-  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 20px; /* Sutilmente mais compacto que 24px */
+  padding: 23px; /* Reduzido de 24px geral para comprimir as margens brancas internas */
   border-width: 1px;
-  border-color: #F4F4F5;
+  border-color: #f4f4f5;
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -408,20 +438,22 @@ const Card = styled.View`
 `;
 
 const CardLabel = styled.Text`
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  color: #A1A1AA;
+  color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 `;
 
 const ItemTitle = styled.Text`
-  font-size: 22px;
+  font-size: 22px; /* Otimizado de 22px para evitar quebras de linhas desnecessárias */
   font-weight: 900;
-  color: #18181B;
-  margin-bottom: 16px;
-  line-height: 28px;
+  color: #18181b;
+  margin-bottom: 12px;
+  line-height: 30px;
+  height: 60px; /* 30px de linha * 2 linhas = 60px fixos */
+  overflow: hidden; /* Garante que nada vaze caso o sistema tente esticar */
 `;
 
 const ItemRow = styled.View`
@@ -431,38 +463,38 @@ const ItemRow = styled.View`
 `;
 
 const ItemPrice = styled.Text`
-  font-size: 15px;
-  color: #71717A;
+  font-size: 16px;
+  color: #71717a;
   font-weight: 700;
 `;
 
 const ItemRemaining = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #10B981;
+  color: #10b981;
 `;
 
 const QtyContainer = styled.View`
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: 20px;
 `;
 
 const QtyButton = styled.TouchableOpacity`
-  width: 56px;
-  height: 56px;
-  border-radius: 20px;
-  background-color: #F4F6F9;
+  width: 48px; /* Reduzido de 56px para economizar altura vertical */
+  height: 48px;
+  border-radius: 16px;
+  background-color: #f4f6f9;
   align-items: center;
   justify-content: center;
 `;
 
 const QtyValue = styled.Text`
-  font-size: 48px;
+  font-size: 38px; /* Otimizado de 48px */
   font-weight: 900;
-  color: #18181B;
-  width: 80px;
+  color: #18181b;
+  width: 70px;
   text-align: center;
 `;
 
@@ -470,11 +502,11 @@ const ToggleCard = styled.View`
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background-color: #FFFFFF;
-  border-radius: 24px;
-  padding: 20px 24px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 16px 20px; /* Reduzido de 20px/24px */
   border-width: 1px;
-  border-color: #F4F4F5;
+  border-color: #f4f4f5;
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -485,122 +517,111 @@ const ToggleCard = styled.View`
 const ToggleTextGroup = styled.View``;
 
 const ToggleTitle = styled.Text`
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
-  color: #18181B;
+  color: #18181b;
 `;
 
 const ToggleSubtitle = styled.Text`
-  font-size: 13px;
-  color: #A1A1AA;
-  margin-top: 4px;
+  font-size: 12px;
+  color: #a1a1aa;
+  margin-top: 2px;
   font-weight: 500;
 `;
 
 const SwitchTrack = styled.TouchableOpacity<{ $isActive: boolean }>`
-  width: 52px;
-  height: 28px;
-  border-radius: 14px;
+  width: 46px; /* Ajuste proporcional leve */
+  height: 26px;
+  border-radius: 13px;
   background-color: ${({ $isActive }) => ($isActive ? "#10B981" : "#E4E4E7")};
   justify-content: center;
   padding-horizontal: 2px;
 `;
 
 const SwitchThumb = styled.View<{ $isActive: boolean }>`
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background-color: #FFFFFF;
-  shadow-color: #000;
-  shadow-offset: 0px 2px;
-  shadow-opacity: 0.15;
-  shadow-radius: 3px;
-  elevation: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #ffffff;
   align-self: ${({ $isActive }) => ($isActive ? "flex-end" : "flex-start")};
 `;
 
 const AvatarGrid = styled.View`
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px; /* Reduzido de 16px */
 `;
 
 const AvatarItem = styled.TouchableOpacity`
   align-items: center;
-  gap: 8px;
-  width: 20%;
+  gap: 6px;
+  width: 21%; /* Pequeno ajuste de encaixe */
 `;
 
 const AvatarCircle = styled.View<{ $isSelected: boolean }>`
-  width: 56px;
-  height: 56px;
-  border-radius: 28px;
+  width: 60px; /* Comprimido levemente de 56px */
+  height: 60px;
+  border-radius: 30px;
   align-items: center;
   justify-content: center;
-  
+
   ${({ $isSelected }) =>
     $isSelected &&
     `
-    border-width: 3px;
+    border-width: 2.5px;
     border-color: #10B981;
-    transform: scale(1.1);
+    transform: scale(1.05);
   `}
 `;
 
 const AvatarText = styled.Text`
   font-weight: 900;
-  color: #FFFFFF;
-  font-size: 18px;
+  color: #ffffff;
+  font-size: 16px;
 `;
 
 const AvatarLabel = styled.Text`
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: #52525B;
+  color: #52525b;
   text-align: center;
 `;
 
 const ConfirmButton = styled.TouchableOpacity`
-  margin-top: 24px;
+  margin-top: 16px; /* Reduzido de 24px */
   width: 100%;
-  padding-vertical: 16px;
-  background-color: #10B981;
-  border-radius: 16px;
+  padding-vertical: 14px;
+  background-color: #10b981;
+  border-radius: 14px;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  
-  shadow-color: #10B981;
-  shadow-offset: 0px 6px;
-  shadow-opacity: 0.25;
-  shadow-radius: 12px;
-  elevation: 4;
 `;
 
 const ConfirmText = styled.Text`
-  color: #FFFFFF;
+  color: #ffffff;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 14px;
 `;
 
 const HelperText = styled.Text`
-  margin-top: 16px;
-  font-size: 13px;
-  color: #D4D4D8;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #d4d4d8;
   text-align: center;
   font-weight: 600;
 `;
 
 const Spacing = styled.View`
-  height: 40px;
+  height: 16px; /* Reduzido drasticamente de 40px para evitar vácuo no final do Scroll */
 `;
 
 const BottomBar = styled.View`
-  padding: 16px 24px 32px 24px;
-  background-color: #FFFFFF;
+  padding: 12px 24px 24px 24px; /* Reduzido padding interno da barra inferior */
+  background-color: #ffffff;
   border-top-width: 1px;
-  border-top-color: #F4F4F5;
+  border-top-color: #f4f4f5;
 `;
 
 const ButtonRow = styled.View`
@@ -608,9 +629,11 @@ const ButtonRow = styled.View`
   gap: 12px;
 `;
 
-const ActionButton = styled.TouchableOpacity<{ $variant: "default" | "primary" | "disabled" }>`
-  padding-vertical: 16px;
-  border-radius: 16px;
+const ActionButton = styled.TouchableOpacity<{
+  $variant: "default" | "primary" | "disabled";
+}>`
+  padding-vertical: 14px; /* Otimizado de 16px */
+  border-radius: 14px;
   flex-direction: row;
   align-items: center;
   justify-content: center;
@@ -620,21 +643,13 @@ const ActionButton = styled.TouchableOpacity<{ $variant: "default" | "primary" |
     if ($variant === "disabled") return "#FAFAFA";
     return "#F4F4F5";
   }};
-
-  ${({ $variant }) =>
-    $variant === "primary" &&
-    `
-    shadow-color: #10B981;
-    shadow-offset: 0px 6px;
-    shadow-opacity: 0.25;
-    shadow-radius: 12px;
-    elevation: 4;
-  `}
 `;
 
-const ActionButtonText = styled.Text<{ $variant: "default" | "primary" | "disabled" }>`
+const ActionButtonText = styled.Text<{
+  $variant: "default" | "primary" | "disabled";
+}>`
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13px;
   color: ${({ $variant }) => {
     if ($variant === "primary") return "#FFFFFF";
     if ($variant === "disabled") return "#A1A1AA";
