@@ -6,6 +6,7 @@ import {
   RotateCcw,
   Undo2,
   Users,
+  X, // <-- Ícone importado para o botão de cancelar
 } from "lucide-react-native";
 import React, { useState } from "react";
 import { View } from "react-native";
@@ -24,7 +25,12 @@ interface UndoEntry {
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 export default function ProcessingScreen() {
-  const { profiles, items, setAllocs: setGlobalAllocs } = useAppContext();
+  const {
+    profiles,
+    items,
+    setItems,
+    setAllocs: setGlobalAllocs,
+  } = useAppContext();
 
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
@@ -139,17 +145,30 @@ export default function ProcessingScreen() {
     router.replace("/summary");
   };
 
+  // 🔥 Função que cancela a compra e zera os itens
+  const onCancelPurchase = () => {
+    setItems([]);
+    router.replace("/");
+  };
+
   return (
     <Container>
       {/* Top Header & Progress */}
       <TopPanel>
         <TopRow>
           <TotalText>Total: {fmt(PURCHASE_TOTAL)}</TotalText>
-          <ProgressLabel>
-            {allDone
-              ? "Concluído ✓"
-              : `Item ${doneCount + 1} de ${items.length}`}
-          </ProgressLabel>
+          <RightActions>
+            <ProgressLabel>
+              {allDone
+                ? "Concluído ✓"
+                : `Item ${doneCount + 1} de ${items.length}`}
+            </ProgressLabel>
+
+            {/* 🔥 Novo botão discreto para Cancelar */}
+            <CancelButton onPress={onCancelPurchase} activeOpacity={0.6}>
+              <X size={18} color="#A1A1AA" />
+            </CancelButton>
+          </RightActions>
         </TopRow>
         <ProgressTrack>
           <ProgressFill style={{ width: `${pct}%` }} />
@@ -157,16 +176,11 @@ export default function ProcessingScreen() {
       </TopPanel>
 
       <ScrollContent
-        scrollEnabled={isScrollable} // Controla dinamicamente se o scroll funciona
+        scrollEnabled={isScrollable}
         alwaysBounceVertical={false}
         bounces={false}
         onContentSizeChange={(contentWidth, contentHeight) => {
-          // Se o conteúdo mudar (ex: mudou de produto), reavalia o tamanho
-          setIsScrollable(contentHeight > 550); // 550px é uma média segura da área útil da tela
-        }}
-        onLayout={(e) => {
-          // Se preferir uma precisão cirúrgica baseada no tamanho exato do layout do seu celular:
-          const layoutHeight = e.nativeEvent.layout.height;
+          setIsScrollable(contentHeight > 550);
         }}
       >
         {allDone ? (
@@ -179,10 +193,8 @@ export default function ProcessingScreen() {
           </DoneContainer>
         ) : (
           <View style={{ gap: 18 }}>
-            {/* Otimizado de 16 para 12 */}
             {/* Produto Atual */}
             <Card style={{ paddingVertical: 16 }}>
-              {/* Reduzido padding vertical */}
               <CardLabel>Produto atual</CardLabel>
               <ItemTitle numberOfLines={2}>{cur?.name}</ItemTitle>
               <ItemRow>
@@ -192,9 +204,9 @@ export default function ProcessingScreen() {
                 </ItemRemaining>
               </ItemRow>
             </Card>
+
             {/* Quantidade */}
             <Card style={{ paddingVertical: 16 }}>
-              {/* Reduzido padding vertical */}
               <CardLabel style={{ marginBottom: 10 }}>
                 Unidades a atribuir
               </CardLabel>
@@ -214,6 +226,7 @@ export default function ProcessingScreen() {
                 </QtyButton>
               </QtyContainer>
             </Card>
+
             {/* Toggle Personalizado */}
             <ToggleCard>
               <ToggleTextGroup>
@@ -234,47 +247,106 @@ export default function ProcessingScreen() {
                 <SwitchThumb $isActive={personalizado} />
               </SwitchTrack>
             </ToggleCard>
+
             {/* Atribuir Para */}
             <Card style={{ paddingVertical: 18 }}>
-              {/* Reduzido padding vertical */}
               <CardLabel style={{ marginBottom: 12 }}>Atribuir para</CardLabel>
+
+              {/* 🔥 Grid Dinâmico e Espaçado Uniformemente */}
               <AvatarGrid>
-                {profiles.map((p) => {
-                  const isSel = personalizado && selected.includes(p.id);
-                  return (
+                {profiles.length === 2 ? (
+                  <>
+                    {/* 1º Perfil (Alinhado à Esquerda) */}
                     <AvatarItem
-                      key={p.id}
-                      onPress={() => clickProfile(p.id)}
+                      onPress={() => clickProfile(profiles[0].id)}
                       activeOpacity={0.7}
                     >
                       <AvatarCircle
-                        style={{ backgroundColor: p.color }}
-                        $isSelected={isSel}
+                        style={{ backgroundColor: profiles[0].color }}
+                        $isSelected={
+                          personalizado && selected.includes(profiles[0].id)
+                        }
                       >
-                        <AvatarText>{getInitials(p.name)}</AvatarText>
+                        <AvatarText>{getInitials(profiles[0].name)}</AvatarText>
                       </AvatarCircle>
-                      <AvatarLabel>{p.name.split(" ")[0]}</AvatarLabel>
+                      <AvatarLabel>
+                        {profiles[0].name.split(" ")[0]}
+                      </AvatarLabel>
                     </AvatarItem>
-                  );
-                })}
 
-                {!personalizado && (
-                  <AvatarItem
-                    onPress={() => attribute(COLLECTIVE)}
-                    activeOpacity={0.7}
-                  >
-                    <AvatarCircle
-                      style={{ backgroundColor: "#27272A" }}
-                      $isSelected={false}
+                    {/* Perfil Coletivo (Alinhado no MEIO) */}
+                    {!personalizado && (
+                      <AvatarItem
+                        onPress={() => attribute(COLLECTIVE)}
+                        activeOpacity={0.7}
+                      >
+                        <AvatarCircle
+                          style={{ backgroundColor: "#27272A" }}
+                          $isSelected={false}
+                        >
+                          <Users size={22} color="#FFFFFF" />
+                        </AvatarCircle>
+                        <AvatarLabel>Ambos</AvatarLabel>
+                      </AvatarItem>
+                    )}
+
+                    {/* 2º Perfil (Alinhado à Direita) */}
+                    <AvatarItem
+                      onPress={() => clickProfile(profiles[1].id)}
+                      activeOpacity={0.7}
                     >
-                      <Users size={22} color="#FFFFFF" />
-                    </AvatarCircle>
-                    <AvatarLabel>
-                      {profiles.length === 2 ? "Ambos" : "Todos"}
-                    </AvatarLabel>
-                  </AvatarItem>
+                      <AvatarCircle
+                        style={{ backgroundColor: profiles[1].color }}
+                        $isSelected={
+                          personalizado && selected.includes(profiles[1].id)
+                        }
+                      >
+                        <AvatarText>{getInitials(profiles[1].name)}</AvatarText>
+                      </AvatarCircle>
+                      <AvatarLabel>
+                        {profiles[1].name.split(" ")[0]}
+                      </AvatarLabel>
+                    </AvatarItem>
+                  </>
+                ) : (
+                  /* Fallback genérico caso no futuro existam mais de 2 pessoas */
+                  <>
+                    {profiles.map((p) => {
+                      const isSel = personalizado && selected.includes(p.id);
+                      return (
+                        <AvatarItem
+                          key={p.id}
+                          onPress={() => clickProfile(p.id)}
+                          activeOpacity={0.7}
+                        >
+                          <AvatarCircle
+                            style={{ backgroundColor: p.color }}
+                            $isSelected={isSel}
+                          >
+                            <AvatarText>{getInitials(p.name)}</AvatarText>
+                          </AvatarCircle>
+                          <AvatarLabel>{p.name.split(" ")[0]}</AvatarLabel>
+                        </AvatarItem>
+                      );
+                    })}
+                    {!personalizado && (
+                      <AvatarItem
+                        onPress={() => attribute(COLLECTIVE)}
+                        activeOpacity={0.7}
+                      >
+                        <AvatarCircle
+                          style={{ backgroundColor: "#27272A" }}
+                          $isSelected={false}
+                        >
+                          <Users size={22} color="#FFFFFF" />
+                        </AvatarCircle>
+                        <AvatarLabel>Todos</AvatarLabel>
+                      </AvatarItem>
+                    )}
+                  </>
                 )}
               </AvatarGrid>
+
               {personalizado && selected.length > 0 && (
                 <ConfirmButton
                   onPress={confirmPersonalizado}
@@ -349,7 +421,7 @@ const Container = styled(SafeAreaView)`
 
 const TopPanel = styled.View`
   background-color: #ffffff;
-  padding: 16px 24px 12px 24px; /* Reduzido padding superior de 24px/16px para 16px/12px */
+  padding: 16px 24px 12px 24px;
   border-bottom-width: 1px;
   border-bottom-color: #e4e4e7;
   z-index: 10;
@@ -358,24 +430,41 @@ const TopPanel = styled.View`
 const TopRow = styled.View`
   flex-direction: row;
   justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px; /* Reduzido de 12px */
+  align-items: center;
+  margin-bottom: 8px;
 `;
 
 const TotalText = styled.Text`
-  font-size: 19px; /* Ajuste sutil de 20px */
+  font-size: 19px;
   font-weight: 900;
   color: #18181b;
 `;
 
+// 🔥 Container que agrupa a label de progresso com o botão de fechar
+const RightActions = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+`;
+
+// 🔥 Novo botão discreto
+const CancelButton = styled.TouchableOpacity`
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #f4f6f9;
+  align-items: center;
+  justify-content: center;
+`;
+
 const ProgressLabel = styled.Text`
-  font-size: 15px; /* Ajuste sutil de 12px */
+  font-size: 15px;
   font-weight: 800;
   color: #a1a1aa;
 `;
 
 const ProgressTrack = styled.View`
-  height: 7px; /* Reduzido de 8px */
+  height: 7px;
   background-color: #f4f4f5;
   border-radius: 3px;
   overflow: hidden;
@@ -390,7 +479,7 @@ const ProgressFill = styled.View`
 const ScrollContent = styled.ScrollView.attrs({
   contentContainerStyle: {
     paddingHorizontal: 24,
-    paddingTop: 16 /* Reduzido de 24 para economizar espaço de entrada */,
+    paddingTop: 16,
   },
 })`
   flex: 1;
@@ -426,8 +515,8 @@ const DoneSubtitle = styled.Text`
 
 const Card = styled.View`
   background-color: #ffffff;
-  border-radius: 20px; /* Sutilmente mais compacto que 24px */
-  padding: 23px; /* Reduzido de 24px geral para comprimir as margens brancas internas */
+  border-radius: 20px;
+  padding: 23px;
   border-width: 1px;
   border-color: #f4f4f5;
   shadow-color: #000;
@@ -447,13 +536,13 @@ const CardLabel = styled.Text`
 `;
 
 const ItemTitle = styled.Text`
-  font-size: 22px; /* Otimizado de 22px para evitar quebras de linhas desnecessárias */
+  font-size: 22px;
   font-weight: 900;
   color: #18181b;
   margin-bottom: 12px;
   line-height: 30px;
-  height: 60px; /* 30px de linha * 2 linhas = 60px fixos */
-  overflow: hidden; /* Garante que nada vaze caso o sistema tente esticar */
+  height: 60px;
+  overflow: hidden;
 `;
 
 const ItemRow = styled.View`
@@ -482,7 +571,7 @@ const QtyContainer = styled.View`
 `;
 
 const QtyButton = styled.TouchableOpacity`
-  width: 48px; /* Reduzido de 56px para economizar altura vertical */
+  width: 48px;
   height: 48px;
   border-radius: 16px;
   background-color: #f4f6f9;
@@ -491,7 +580,7 @@ const QtyButton = styled.TouchableOpacity`
 `;
 
 const QtyValue = styled.Text`
-  font-size: 38px; /* Otimizado de 48px */
+  font-size: 38px;
   font-weight: 900;
   color: #18181b;
   width: 70px;
@@ -504,7 +593,7 @@ const ToggleCard = styled.View`
   justify-content: space-between;
   background-color: #ffffff;
   border-radius: 20px;
-  padding: 16px 20px; /* Reduzido de 20px/24px */
+  padding: 16px 20px;
   border-width: 1px;
   border-color: #f4f4f5;
   shadow-color: #000;
@@ -530,7 +619,7 @@ const ToggleSubtitle = styled.Text`
 `;
 
 const SwitchTrack = styled.TouchableOpacity<{ $isActive: boolean }>`
-  width: 46px; /* Ajuste proporcional leve */
+  width: 46px;
   height: 26px;
   border-radius: 13px;
   background-color: ${({ $isActive }) => ($isActive ? "#10B981" : "#E4E4E7")};
@@ -546,20 +635,22 @@ const SwitchThumb = styled.View<{ $isActive: boolean }>`
   align-self: ${({ $isActive }) => ($isActive ? "flex-end" : "flex-start")};
 `;
 
+// 🔥 Grid dos Avatares agora os divide usando todo o espaço uniformemente
 const AvatarGrid = styled.View`
   flex-direction: row;
-  flex-wrap: wrap;
-  gap: 12px; /* Reduzido de 16px */
+  justify-content: space-between;
+  width: 100%;
 `;
 
+// 🔥 AvatarItem se expande flexivelmente (flex: 1) para ocupar o espaço de maneira igual
 const AvatarItem = styled.TouchableOpacity`
   align-items: center;
+  flex: 1;
   gap: 6px;
-  width: 21%; /* Pequeno ajuste de encaixe */
 `;
 
 const AvatarCircle = styled.View<{ $isSelected: boolean }>`
-  width: 60px; /* Comprimido levemente de 56px */
+  width: 60px;
   height: 60px;
   border-radius: 30px;
   align-items: center;
@@ -588,7 +679,7 @@ const AvatarLabel = styled.Text`
 `;
 
 const ConfirmButton = styled.TouchableOpacity`
-  margin-top: 16px; /* Reduzido de 24px */
+  margin-top: 16px;
   width: 100%;
   padding-vertical: 14px;
   background-color: #10b981;
@@ -614,11 +705,11 @@ const HelperText = styled.Text`
 `;
 
 const Spacing = styled.View`
-  height: 16px; /* Reduzido drasticamente de 40px para evitar vácuo no final do Scroll */
+  height: 16px;
 `;
 
 const BottomBar = styled.View`
-  padding: 12px 24px 24px 24px; /* Reduzido padding interno da barra inferior */
+  padding: 12px 24px 24px 24px;
   background-color: #ffffff;
   border-top-width: 1px;
   border-top-color: #f4f4f5;
@@ -632,7 +723,7 @@ const ButtonRow = styled.View`
 const ActionButton = styled.TouchableOpacity<{
   $variant: "default" | "primary" | "disabled";
 }>`
-  padding-vertical: 14px; /* Otimizado de 16px */
+  padding-vertical: 14px;
   border-radius: 14px;
   flex-direction: row;
   align-items: center;

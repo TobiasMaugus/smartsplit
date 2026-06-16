@@ -40,11 +40,24 @@ export default function MainScreen() {
   const handleWebViewMessage = (event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
+
+      // 🔥 INTERCEPTA OS LOGS DO WEBVIEW E IMPRIME NO TERMINAL DO EXPO
+      if (msg.type === "LOG") {
+        console.log(`[WebScraping] ${msg.message}`);
+        return;
+      }
+
       if (msg.type === "ITEMS_FOUND") {
+        console.log(
+          `[WebScraping] Sucesso! ${msg.data.length} itens encontrados.`,
+        );
+        console.log(
+          `[WebScraping] Mercado: ${msg.marketName} | Data: ${msg.dateCompra}`,
+        );
+
         if (msg.data.length > 0) {
           setItems(msg.data);
 
-          // 🔥 SALVA OS DADOS RASPADOS DIRETAMENTE NO CONTEXTO GLOBAL
           setScrapedMarket(msg.marketName || "");
           setScrapedDate(msg.dateCompra || "");
 
@@ -58,6 +71,7 @@ export default function MainScreen() {
           setScannedUrl(null);
         }
       } else if (msg.type === "ERROR") {
+        console.error(`[WebScraping] Erro Fatal: ${msg.message}`);
         Alert.alert(
           "Erro de Leitura",
           "Falha ao ler os produtos: " + msg.message,
@@ -65,7 +79,7 @@ export default function MainScreen() {
         setScannedUrl(null);
       }
     } catch (e) {
-      console.error(e);
+      console.error("[WebScraping] Erro ao processar mensagem do WebView", e);
       Alert.alert("Erro", "Ocorreu um erro ao processar os dados da nota.");
       setScannedUrl(null);
     }
@@ -73,11 +87,18 @@ export default function MainScreen() {
 
   const INJECTED_JS = `
     setTimeout(() => {
+      // 🔥 Função auxiliar para mandar LOGs para o React Native
+      const sendLog = (msg) => {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOG', message: msg }));
+      };
+
       try {
+        sendLog("Iniciando a varredura do DOM...");
         const items = [];
         let idCounter = 1;
         
-        // 🔥 Lógica de Extração do Nome do Mercado (SEFAZ-MG)
+        // --- 1. NOME DO MERCADO ---
+        sendLog("1. Buscando nome do mercado...");
         let marketName = "";
         const marketEl =
           document.querySelector("th.text-center.text-uppercase h4 b") ||
@@ -85,56 +106,47 @@ export default function MainScreen() {
           document.querySelector("table.table th b");
         
         if (marketEl) {
-          marketName = marketEl.innerText.trim();
+          let rawName = marketEl.innerText.trim();
+            
+            // 🔥 REGRA NOVA: Remove "SUPERMERCADO" ou "SUPERMERCADOS" (gi = ignora maiúsculo/minúsculo)
+            // O replace(/\\s+/g, ' ') garante que não vão sobrar espaços duplos se a palavra for cortada do meio
+            marketName = rawName
+              .replace(/SUPERMERCADOS?/gi, '')
+              .replace(/\\s+/g, ' ')
+              .trim();
+              
+            sendLog("   -> Mercado encontrado: " + marketName + " (Original: " + rawName + ")");
+        } else {
+          sendLog("   -> Aviso: Mercado não encontrado, usará o fallback.");
         }
 
-        // 🔥 NOVA Lógica de Extração da Data da Compra (SEFAZ-MG)
+        // --- 2. DATA DA COMPRA ---
+        sendLog("2. Buscando a data de emissão...");
         let dateCompra = new Date().toLocaleDateString("pt-BR");
+        const htmlContent = document.body.innerHTML;
+        
+        const dateMatch = htmlContent.match(/(?:Emiss[aã]o|Data)[^0-9]*?(\\d{2}\\/\\d{2}\\/\\d{4})/i);
 
-        const dateLabel = Array.from(
-          document.querySelectorAll("th, td, span, strong, div, li, p")
-        ).find((el) => /Data\\s*Emiss/i.test(el.innerText));
-
-        if (dateLabel) {
-          let dateText = "";
-
-          const candidates = [
-            dateLabel.nextElementSibling,
-            dateLabel.parentElement?.nextElementSibling,
-            dateLabel.closest("table")?.querySelector("tbody tr td:last-child"),
-            dateLabel.closest("table")?.querySelector("tbody tr td"),
-            dateLabel.closest("div")?.querySelector("td:last-child"),
-            dateLabel.closest("div")?.querySelector("td"),
-          ];
-
-          for (const node of candidates) {
-            if (!node?.innerText) continue;
-            const match = node.innerText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
-            if (match) {
-              dateText = match[1];
-              break;
-            }
-          }
-
-          if (!dateText) {
-            const ancestorText =
-              dateLabel.closest("table")?.innerText ||
-              dateLabel.parentElement?.innerText ||
-              "";
-            const match = ancestorText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
-            if (match) {
-              dateText = match[1];
-            }
-          }
-
-          if (dateText) {
-            dateCompra = dateText;
+        if (dateMatch && dateMatch[1]) {
+          dateCompra = dateMatch[1];
+          sendLog("   -> Sucesso! Data encontrada (Regex 1): " + dateCompra);
+        } else {
+          sendLog("   -> Aviso: Regex principal falhou, tentando Fallback secundário...");
+          const qualquerDataMatch = htmlContent.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
+          if (qualquerDataMatch) {
+            dateCompra = qualquerDataMatch[1];
+            sendLog("   -> Sucesso! Data encontrada (Fallback Secundário): " + dateCompra);
+          } else {
+            sendLog("   -> Erro: Nenhuma data encontrada na página. Usará a data de hoje.");
           }
         }
 
-        // Formato atual (MG e outros estados que usam o mesmo sistema)
+        // --- 3. PRODUTOS DA NOTA ---
+        sendLog("3. Buscando os produtos...");
         const rows = document.querySelectorAll('tr');
-        rows.forEach(row => {
+        sendLog("   -> Total de linhas <tr> na página: " + rows.length);
+        
+        rows.forEach((row, index) => {
           const text = row.innerText.replace(/\\s+/g, ' ').trim();
           const match = text.match(/(.*?)\\s*\\(C[oó]digo:.*?\\).*?Qtde.*?:\\s*([0-9.,]+)\\s*UN:\\s*([A-Za-z]+).*?(?:Valor|Vl).*?:\\s*R\\$\\s*([0-9.,]+)/i);
           
@@ -161,9 +173,11 @@ export default function MainScreen() {
             });
           }
         });
+        sendLog("   -> Produtos encontrados usando Regex Padrão: " + items.length);
         
         // Fallback para formato antigo (txtTit2)
         if (items.length === 0) {
+          sendLog("   -> Aviso: Tentando Fallback para notas antigas (.txtTit2)...");
           const nameElements = document.querySelectorAll('.txtTit2');
           nameElements.forEach(nameEl => {
             const name = nameEl.innerText.trim();
@@ -196,9 +210,10 @@ export default function MainScreen() {
               });
             }
           });
+          sendLog("   -> Produtos encontrados usando Fallback Secundário: " + items.length);
         }
         
-        // Envia os itens, o nome do mercado e a data para o App
+        sendLog("4. Extração concluída. Enviando dados ao React Native...");
         window.ReactNativeWebView.postMessage(JSON.stringify({ 
           type: 'ITEMS_FOUND', 
           data: items,
@@ -206,6 +221,7 @@ export default function MainScreen() {
           dateCompra: dateCompra
         }));
       } catch(err) {
+        sendLog("ERRO CRÍTICO: " + err.toString());
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: err.toString() }));
       }
     }, 4000); // 4s para garantir que o portal carregue
@@ -379,6 +395,7 @@ export default function MainScreen() {
     </Container>
   );
 }
+
 // --- Styled Components ---
 
 const Container = styled(SafeAreaView)`
