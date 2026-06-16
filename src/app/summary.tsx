@@ -115,10 +115,10 @@ export default function SummaryScreen() {
       .join("\n");
 
     const message = [
-      `💰 Rateio Concluído!`,
+      `💰 Divisão Concluída!`,
       scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "", // 🔥 Mostra o mercado no WhatsApp
       `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
-      `Pagador: ${payer.name}`,
+      `Pagador: ${payer.name} \n`,
       ``,
       debtLines,
       ``,
@@ -254,7 +254,7 @@ export default function SummaryScreen() {
               <User size={20} color="#A1A1AA" />
             </EmptyPayerIcon>
             <EmptyPayerText>
-              Selecione quem pagou para ver o rateio
+              Selecione quem pagou para ver a divisão de valores
             </EmptyPayerText>
           </EmptyPayerBox>
         )}

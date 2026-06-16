@@ -6,7 +6,7 @@ import {
   RotateCcw,
   Undo2,
   Users,
-  X, // <-- Ícone importado para o botão de cancelar
+  X,
 } from "lucide-react-native";
 import React, { useState } from "react";
 import { View } from "react-native";
@@ -57,6 +57,9 @@ export default function ProcessingScreen() {
   const doneCount = items.filter((i) => remaining[i.id] === 0).length;
   const pct = items.length > 0 ? (doneCount / items.length) * 100 : 0;
   const clamp = (v: number) => Math.max(1, Math.min(v, rem));
+
+  // 🔥 Verificação que ativará o design espaçoso caso só tenhamos 2 perfis
+  const isTwoProfiles = profiles.length === 2;
 
   const pushUndo = (r: Record<string, number>, a: Allocations, idx: number) =>
     setUndoStack((s) => [
@@ -145,7 +148,6 @@ export default function ProcessingScreen() {
     router.replace("/summary");
   };
 
-  // 🔥 Função que cancela a compra e zera os itens
   const onCancelPurchase = () => {
     setItems([]);
     router.replace("/");
@@ -153,7 +155,6 @@ export default function ProcessingScreen() {
 
   return (
     <Container>
-      {/* Top Header & Progress */}
       <TopPanel>
         <TopRow>
           <TotalText>Total: {fmt(PURCHASE_TOTAL)}</TotalText>
@@ -163,8 +164,6 @@ export default function ProcessingScreen() {
                 ? "Concluído ✓"
                 : `Item ${doneCount + 1} de ${items.length}`}
             </ProgressLabel>
-
-            {/* 🔥 Novo botão discreto para Cancelar */}
             <CancelButton onPress={onCancelPurchase} activeOpacity={0.6}>
               <X size={18} color="#A1A1AA" />
             </CancelButton>
@@ -192,124 +191,140 @@ export default function ProcessingScreen() {
             <DoneSubtitle>Clique em Finalizar para ver o resumo.</DoneSubtitle>
           </DoneContainer>
         ) : (
-          <View style={{ gap: 18 }}>
-            {/* Produto Atual */}
-            <Card style={{ paddingVertical: 16 }}>
+          <View style={{ gap: isTwoProfiles ? 14 : 18 }}>
+            {/* --- Produto Atual --- */}
+            <Card $isSpacious={isTwoProfiles}>
               <CardLabel>Produto atual</CardLabel>
-              <ItemTitle numberOfLines={2}>{cur?.name}</ItemTitle>
+              <ItemTitle $isSpacious={isTwoProfiles} numberOfLines={2}>
+                {cur?.name}
+              </ItemTitle>
               <ItemRow>
-                <ItemPrice>{fmt(cur?.unitPrice ?? 0)} / un.</ItemPrice>
-                <ItemRemaining>
+                <ItemPrice $isSpacious={isTwoProfiles}>
+                  {fmt(cur?.unitPrice ?? 0)} / un.
+                </ItemPrice>
+                <ItemRemaining $isSpacious={isTwoProfiles}>
                   Faltam {rem} {rem === 1 ? "unidade" : "unidades"}
                 </ItemRemaining>
               </ItemRow>
             </Card>
 
-            {/* Quantidade */}
-            <Card style={{ paddingVertical: 16 }}>
+            {/* --- Quantidade --- */}
+            <Card $isSpacious={isTwoProfiles}>
               <CardLabel style={{ marginBottom: 10 }}>
                 Unidades a atribuir
               </CardLabel>
               <QtyContainer>
                 <QtyButton
+                  $isSpacious={isTwoProfiles}
                   onPress={() => setQty(clamp(qty - 1))}
                   activeOpacity={0.7}
                 >
-                  <Minus size={20} color="#3F3F46" />
+                  <Minus size={isTwoProfiles ? 24 : 20} color="#3F3F46" />
                 </QtyButton>
-                <QtyValue>{Math.min(qty, rem)}</QtyValue>
+                <QtyValue $isSpacious={isTwoProfiles}>
+                  {Math.min(qty, rem)}
+                </QtyValue>
                 <QtyButton
+                  $isSpacious={isTwoProfiles}
                   onPress={() => setQty(clamp(qty + 1))}
                   activeOpacity={0.7}
                 >
-                  <Plus size={20} color="#3F3F46" />
+                  <Plus size={isTwoProfiles ? 24 : 20} color="#3F3F46" />
                 </QtyButton>
               </QtyContainer>
             </Card>
 
-            {/* Toggle Personalizado */}
-            <ToggleCard>
-              <ToggleTextGroup>
-                <ToggleTitle>Modo Personalizado</ToggleTitle>
-                <ToggleSubtitle>
-                  {personalizado ? "Multi-seleção ativa" : "Seleção individual"}
-                </ToggleSubtitle>
-              </ToggleTextGroup>
-              <SwitchTrack
-                onPress={() => {
-                  setPersonalizado((p) => !p);
-                  setSelected([]);
-                  qty > rem ? setQty(clamp(qty)) : null;
-                }}
-                activeOpacity={1}
-                $isActive={personalizado}
-              >
-                <SwitchThumb $isActive={personalizado} />
-              </SwitchTrack>
-            </ToggleCard>
+            {/* --- Toggle Personalizado (Oculto se isTwoProfiles) --- */}
+            {!isTwoProfiles && (
+              <ToggleCard>
+                <ToggleTextGroup>
+                  <ToggleTitle>Modo Personalizado</ToggleTitle>
+                  <ToggleSubtitle>
+                    {personalizado
+                      ? "Multi-seleção ativa"
+                      : "Seleção individual"}
+                  </ToggleSubtitle>
+                </ToggleTextGroup>
+                <SwitchTrack
+                  onPress={() => {
+                    setPersonalizado((p) => !p);
+                    setSelected([]);
+                    qty > rem ? setQty(clamp(qty)) : null;
+                  }}
+                  activeOpacity={1}
+                  $isActive={personalizado}
+                >
+                  <SwitchThumb $isActive={personalizado} />
+                </SwitchTrack>
+              </ToggleCard>
+            )}
 
-            {/* Atribuir Para */}
-            <Card style={{ paddingVertical: 18 }}>
+            {/* --- Atribuir Para --- */}
+            <Card $isSpacious={isTwoProfiles}>
               <CardLabel style={{ marginBottom: 12 }}>Atribuir para</CardLabel>
-
-              {/* 🔥 Grid Dinâmico e Espaçado Uniformemente */}
               <AvatarGrid>
-                {profiles.length === 2 ? (
+                {isTwoProfiles ? (
                   <>
-                    {/* 1º Perfil (Alinhado à Esquerda) */}
+                    {/* 1º Perfil */}
                     <AvatarItem
                       onPress={() => clickProfile(profiles[0].id)}
                       activeOpacity={0.7}
                     >
                       <AvatarCircle
+                        $isSpacious={isTwoProfiles}
                         style={{ backgroundColor: profiles[0].color }}
                         $isSelected={
                           personalizado && selected.includes(profiles[0].id)
                         }
                       >
-                        <AvatarText>{getInitials(profiles[0].name)}</AvatarText>
+                        <AvatarText $isSpacious={isTwoProfiles}>
+                          {getInitials(profiles[0].name)}
+                        </AvatarText>
                       </AvatarCircle>
-                      <AvatarLabel>
+                      <AvatarLabel $isSpacious={isTwoProfiles}>
                         {profiles[0].name.split(" ")[0]}
                       </AvatarLabel>
                     </AvatarItem>
 
-                    {/* Perfil Coletivo (Alinhado no MEIO) */}
-                    {!personalizado && (
-                      <AvatarItem
-                        onPress={() => attribute(COLLECTIVE)}
-                        activeOpacity={0.7}
+                    {/* Perfil Coletivo (Ambos) */}
+                    <AvatarItem
+                      onPress={() => attribute(COLLECTIVE)}
+                      activeOpacity={0.7}
+                    >
+                      <AvatarCircle
+                        $isSpacious={isTwoProfiles}
+                        style={{ backgroundColor: "#27272A" }}
+                        $isSelected={false}
                       >
-                        <AvatarCircle
-                          style={{ backgroundColor: "#27272A" }}
-                          $isSelected={false}
-                        >
-                          <Users size={22} color="#FFFFFF" />
-                        </AvatarCircle>
-                        <AvatarLabel>Ambos</AvatarLabel>
-                      </AvatarItem>
-                    )}
+                        <Users size={isTwoProfiles ? 28 : 22} color="#FFFFFF" />
+                      </AvatarCircle>
+                      <AvatarLabel $isSpacious={isTwoProfiles}>
+                        Ambos
+                      </AvatarLabel>
+                    </AvatarItem>
 
-                    {/* 2º Perfil (Alinhado à Direita) */}
+                    {/* 2º Perfil */}
                     <AvatarItem
                       onPress={() => clickProfile(profiles[1].id)}
                       activeOpacity={0.7}
                     >
                       <AvatarCircle
+                        $isSpacious={isTwoProfiles}
                         style={{ backgroundColor: profiles[1].color }}
                         $isSelected={
                           personalizado && selected.includes(profiles[1].id)
                         }
                       >
-                        <AvatarText>{getInitials(profiles[1].name)}</AvatarText>
+                        <AvatarText $isSpacious={isTwoProfiles}>
+                          {getInitials(profiles[1].name)}
+                        </AvatarText>
                       </AvatarCircle>
-                      <AvatarLabel>
+                      <AvatarLabel $isSpacious={isTwoProfiles}>
                         {profiles[1].name.split(" ")[0]}
                       </AvatarLabel>
                     </AvatarItem>
                   </>
                 ) : (
-                  /* Fallback genérico caso no futuro existam mais de 2 pessoas */
                   <>
                     {profiles.map((p) => {
                       const isSel = personalizado && selected.includes(p.id);
@@ -320,12 +335,17 @@ export default function ProcessingScreen() {
                           activeOpacity={0.7}
                         >
                           <AvatarCircle
+                            $isSpacious={false}
                             style={{ backgroundColor: p.color }}
                             $isSelected={isSel}
                           >
-                            <AvatarText>{getInitials(p.name)}</AvatarText>
+                            <AvatarText $isSpacious={false}>
+                              {getInitials(p.name)}
+                            </AvatarText>
                           </AvatarCircle>
-                          <AvatarLabel>{p.name.split(" ")[0]}</AvatarLabel>
+                          <AvatarLabel $isSpacious={false}>
+                            {p.name.split(" ")[0]}
+                          </AvatarLabel>
                         </AvatarItem>
                       );
                     })}
@@ -335,12 +355,13 @@ export default function ProcessingScreen() {
                         activeOpacity={0.7}
                       >
                         <AvatarCircle
+                          $isSpacious={false}
                           style={{ backgroundColor: "#27272A" }}
                           $isSelected={false}
                         >
                           <Users size={22} color="#FFFFFF" />
                         </AvatarCircle>
-                        <AvatarLabel>Todos</AvatarLabel>
+                        <AvatarLabel $isSpacious={false}>Todos</AvatarLabel>
                       </AvatarItem>
                     )}
                   </>
@@ -368,8 +389,19 @@ export default function ProcessingScreen() {
         <Spacing />
       </ScrollContent>
 
-      {/* Footer / Ações */}
       <BottomBar>
+        {/* Botão Finalizar aparece ACIMA e ocupa a largura total */}
+        {allDone && (
+          <ActionButton
+            onPress={onFinalize}
+            $variant="primary"
+            activeOpacity={0.85}
+            style={{ marginBottom: 12 }}
+          >
+            <ActionButtonText $variant="primary">Finalizar</ActionButtonText>
+          </ActionButton>
+        )}
+
         <ButtonRow>
           <ActionButton
             onPress={undo}
@@ -395,17 +427,6 @@ export default function ProcessingScreen() {
             <RotateCcw size={18} color="#3F3F46" />
             <ActionButtonText $variant="default">Reiniciar</ActionButtonText>
           </ActionButton>
-
-          {allDone && (
-            <ActionButton
-              onPress={onFinalize}
-              $variant="primary"
-              activeOpacity={0.85}
-              style={{ flex: 1 }}
-            >
-              <ActionButtonText $variant="primary">Finalizar</ActionButtonText>
-            </ActionButton>
-          )}
         </ButtonRow>
       </BottomBar>
     </Container>
@@ -440,14 +461,12 @@ const TotalText = styled.Text`
   color: #18181b;
 `;
 
-// 🔥 Container que agrupa a label de progresso com o botão de fechar
 const RightActions = styled.View`
   flex-direction: row;
   align-items: center;
   gap: 12px;
 `;
 
-// 🔥 Novo botão discreto
 const CancelButton = styled.TouchableOpacity`
   width: 28px;
   height: 28px;
@@ -513,10 +532,11 @@ const DoneSubtitle = styled.Text`
   font-weight: 500;
 `;
 
-const Card = styled.View`
+// 🔥 Card Dinâmico: Aumenta o espaçamento interno se houver apenas 2 perfis
+const Card = styled.View<{ $isSpacious?: boolean }>`
   background-color: #ffffff;
   border-radius: 20px;
-  padding: 23px;
+  padding: ${({ $isSpacious }) => ($isSpacious ? "32px 24px" : "20px 24px")};
   border-width: 1px;
   border-color: #f4f4f5;
   shadow-color: #000;
@@ -535,13 +555,14 @@ const CardLabel = styled.Text`
   margin-bottom: 6px;
 `;
 
-const ItemTitle = styled.Text`
-  font-size: 22px;
+// 🔥 Título Dinâmico
+const ItemTitle = styled.Text<{ $isSpacious?: boolean }>`
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "26px" : "22px")};
   font-weight: 900;
   color: #18181b;
   margin-bottom: 12px;
-  line-height: 30px;
-  height: 60px;
+  line-height: ${({ $isSpacious }) => ($isSpacious ? "34px" : "30px")};
+  height: ${({ $isSpacious }) => ($isSpacious ? "68px" : "60px")};
   overflow: hidden;
 `;
 
@@ -551,14 +572,14 @@ const ItemRow = styled.View`
   align-items: center;
 `;
 
-const ItemPrice = styled.Text`
-  font-size: 16px;
+const ItemPrice = styled.Text<{ $isSpacious?: boolean }>`
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "18px" : "16px")};
   color: #71717a;
   font-weight: 700;
 `;
 
-const ItemRemaining = styled.Text`
-  font-size: 14px;
+const ItemRemaining = styled.Text<{ $isSpacious?: boolean }>`
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "16px" : "14px")};
   font-weight: 800;
   color: #10b981;
 `;
@@ -570,17 +591,17 @@ const QtyContainer = styled.View`
   gap: 20px;
 `;
 
-const QtyButton = styled.TouchableOpacity`
-  width: 48px;
-  height: 48px;
+const QtyButton = styled.TouchableOpacity<{ $isSpacious?: boolean }>`
+  width: ${({ $isSpacious }) => ($isSpacious ? "56px" : "48px")};
+  height: ${({ $isSpacious }) => ($isSpacious ? "56px" : "48px")};
   border-radius: 16px;
   background-color: #f4f6f9;
   align-items: center;
   justify-content: center;
 `;
 
-const QtyValue = styled.Text`
-  font-size: 38px;
+const QtyValue = styled.Text<{ $isSpacious?: boolean }>`
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "48px" : "38px")};
   font-weight: 900;
   color: #18181b;
   width: 70px;
@@ -635,24 +656,26 @@ const SwitchThumb = styled.View<{ $isActive: boolean }>`
   align-self: ${({ $isActive }) => ($isActive ? "flex-end" : "flex-start")};
 `;
 
-// 🔥 Grid dos Avatares agora os divide usando todo o espaço uniformemente
 const AvatarGrid = styled.View`
   flex-direction: row;
   justify-content: space-between;
   width: 100%;
 `;
 
-// 🔥 AvatarItem se expande flexivelmente (flex: 1) para ocupar o espaço de maneira igual
 const AvatarItem = styled.TouchableOpacity`
   align-items: center;
   flex: 1;
   gap: 6px;
 `;
 
-const AvatarCircle = styled.View<{ $isSelected: boolean }>`
-  width: 60px;
-  height: 60px;
-  border-radius: 30px;
+// 🔥 Avatar e textos aumentam se isTwoProfiles
+const AvatarCircle = styled.View<{
+  $isSelected: boolean;
+  $isSpacious?: boolean;
+}>`
+  width: ${({ $isSpacious }) => ($isSpacious ? "76px" : "60px")};
+  height: ${({ $isSpacious }) => ($isSpacious ? "76px" : "60px")};
+  border-radius: ${({ $isSpacious }) => ($isSpacious ? "38px" : "30px")};
   align-items: center;
   justify-content: center;
 
@@ -665,14 +688,14 @@ const AvatarCircle = styled.View<{ $isSelected: boolean }>`
   `}
 `;
 
-const AvatarText = styled.Text`
+const AvatarText = styled.Text<{ $isSpacious?: boolean }>`
   font-weight: 900;
   color: #ffffff;
-  font-size: 16px;
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "22px" : "16px")};
 `;
 
-const AvatarLabel = styled.Text`
-  font-size: 11px;
+const AvatarLabel = styled.Text<{ $isSpacious?: boolean }>`
+  font-size: ${({ $isSpacious }) => ($isSpacious ? "13px" : "11px")};
   font-weight: 700;
   color: #52525b;
   text-align: center;

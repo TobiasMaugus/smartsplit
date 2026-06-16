@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
 import { AppProvider, useAppContext } from "../context/AppContext";
 import "../global.css";
@@ -15,26 +15,37 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Estado para garantir um tempo mínimo de exibição da sua animação
+  const [minTimeDone, setMinTimeDone] = useState(false);
+
   // 🌟 O coração da nossa nova animação do Infinito
   const infinityAnim = useRef(new Animated.Value(0)).current;
 
-  // useEffect(() => {
-  //   SplashScreen.hideAsync();
-  // }, []);
+  // 🔥 PASSO 1: Esconde a splash nativa IMEDIATAMENTE para revelar seu loading customizado
+  // E define um tempo mínimo de 2 segundos para a animação respirar
+  useEffect(() => {
+    SplashScreen.hideAsync();
+
+    const timer = setTimeout(() => {
+      setMinTimeDone(true);
+    }, 2000); // 2000ms = 2 segundos de loading animado
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    if (!isHydrated) {
-      // Cria um loop contínuo que vai de 0 a 1 em 1.5 segundos
+    if (!isHydrated || !minTimeDone) {
+      // Cria um loop contínuo que vai de 0 a 1
       Animated.loop(
         Animated.timing(infinityAnim, {
           toValue: 1,
-          duration: 900, // Tempo de uma volta completa no infinito (1.5s)
+          duration: 900, // Tempo de uma volta completa no infinito
           easing: Easing.linear,
           useNativeDriver: true,
         }),
       ).start();
     }
-  }, [isHydrated]);
+  }, [isHydrated, minTimeDone]);
 
   // ====================================================================
   // 📐 MATEMÁTICA DA ANIMAÇÃO DO INFINITO (Curva de Figura 8)
@@ -71,7 +82,8 @@ function RootLayoutNav() {
   });
 
   useEffect(() => {
-    if (!isHydrated) return;
+    // 🔥 PASSO 2: Só decide a rota quando o banco local hidratar E o tempo mínimo acabar
+    if (!isHydrated || !minTimeDone) return;
 
     const decideRoute = async () => {
       try {
@@ -103,32 +115,24 @@ function RootLayoutNav() {
         // 1. Cenário: Usuário novo -> Força ir para o Setup
         if (storedCount < 2 && !currentIsSetup) {
           await router.replace("/setup");
-          // Oculta a splash screen LOGO APÓS trocar para a tela correta nos bastidores
-          await SplashScreen.hideAsync();
           return;
         }
 
         // 2. Cenário: Já tem perfis e abriu o app do zero -> Manda para a Index
         if (storedCount >= 2 && isAtRoot) {
           await router.replace("/(tabs)");
-          // Oculta a splash screen LOGO APÓS trocar para a tela correta nos bastidores
-          await SplashScreen.hideAsync();
           return;
         }
-
-        // 3. Caso o app já tenha carregado e esteja apenas navegando normalmente
-        await SplashScreen.hideAsync();
       } catch (e) {
         console.error("Error deciding initial route", e);
-        // Garante que o app não vai travar na splash caso dê algum erro na leitura
-        await SplashScreen.hideAsync();
       }
     };
 
     decideRoute();
-  }, [profiles, isHydrated, segments]);
+  }, [profiles, isHydrated, segments, minTimeDone]);
 
-  if (!isHydrated) {
+  // 🔥 PASSO 3: Condição de Loading cobrindo a hidratação e o tempo mínimo
+  if (!isHydrated || !minTimeDone) {
     return (
       <View
         style={{
