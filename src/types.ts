@@ -29,11 +29,19 @@ export interface HistoryEntry {
   total: number;
   payer: Profile;
   desc: string;
+  marketName?: string;
+  dateCompra?: string;
 }
 
 export const COLORS = [
-  "#6C63FF", "#FF4757", "#00C853", "#FF9500",
-  "#00BCD4", "#E91E63", "#1976D2", "#F4511E",
+  "#6C63FF",
+  "#FF4757",
+  "#00C853",
+  "#FF9500",
+  "#00BCD4",
+  "#E91E63",
+  "#1976D2",
+  "#F4511E",
 ];
 
 export const COLLECTIVE = "__collective__";

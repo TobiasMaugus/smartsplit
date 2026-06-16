@@ -10,31 +10,6 @@ import { COLORS, ProfileForm } from "../types";
 
 export default function SetupScreen() {
   const { profiles, setProfiles } = useAppContext();
-
-  const initialForms: ProfileForm[] =
-    profiles.length >= 2
-      ? profiles.map((p) => ({ ...p, showPix: !!p.pixKey }))
-      : [
-          {
-            id: "p1",
-            name: "",
-            color: COLORS[0],
-            pixKey: "",
-            pixName: "",
-            pixCity: "",
-            showPix: false,
-          },
-          {
-            id: "p2",
-            name: "",
-            color: COLORS[1],
-            pixKey: "",
-            pixName: "",
-            pixCity: "",
-            showPix: false,
-          },
-        ];
-
   const [forms, setForms] = useState<ProfileForm[]>([]);
   useEffect(() => {
     if (profiles && profiles.length >= 2) {
@@ -44,6 +19,28 @@ export default function SetupScreen() {
           showPix: !!p.pixKey,
         })),
       );
+    } else {
+      // Se for o primeiro acesso (sem perfis no banco), gera 2 perfis em branco por padrão
+      setForms([
+        {
+          id: "perfil_1",
+          name: "",
+          color: COLORS[0] || "#10B981",
+          pixKey: "",
+          pixName: "",
+          pixCity: "",
+          showPix: false,
+        },
+        {
+          id: "perfil_2",
+          name: "",
+          color: COLORS[1] || "#3B82F6",
+          pixKey: "",
+          pixName: "",
+          pixCity: "",
+          showPix: false,
+        },
+      ]);
     }
   }, [profiles]);
 
@@ -67,7 +64,7 @@ export default function SetupScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(tabs)/");
+      router.replace("/(tabs)");
     }
   };
 

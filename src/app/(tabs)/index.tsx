@@ -10,7 +10,14 @@ import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
 
 export default function MainScreen() {
-  const { profiles, loadMockData, items, setItems } = useAppContext();
+  const {
+    profiles,
+    loadMockData,
+    items,
+    setItems,
+    setScrapedMarket,
+    setScrapedDate,
+  } = useAppContext();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
@@ -36,6 +43,11 @@ export default function MainScreen() {
       if (msg.type === "ITEMS_FOUND") {
         if (msg.data.length > 0) {
           setItems(msg.data);
+
+          // 🔥 SALVA OS DADOS RASPADOS DIRETAMENTE NO CONTEXTO GLOBAL
+          setScrapedMarket(msg.marketName || "");
+          setScrapedDate(msg.dateCompra || "");
+
           setScannedUrl(null);
           router.push("/processing");
         } else {
@@ -65,6 +77,61 @@ export default function MainScreen() {
         const items = [];
         let idCounter = 1;
         
+        // 🔥 Lógica de Extração do Nome do Mercado (SEFAZ-MG)
+        let marketName = "";
+        const marketEl =
+          document.querySelector("th.text-center.text-uppercase h4 b") ||
+          document.querySelector("table.table thead th h4 b") ||
+          document.querySelector("table.table th b");
+        
+        if (marketEl) {
+          marketName = marketEl.innerText.trim();
+        }
+
+        // 🔥 NOVA Lógica de Extração da Data da Compra (SEFAZ-MG)
+        let dateCompra = new Date().toLocaleDateString("pt-BR");
+
+        const dateLabel = Array.from(
+          document.querySelectorAll("th, td, span, strong, div, li, p")
+        ).find((el) => /Data\\s*Emiss/i.test(el.innerText));
+
+        if (dateLabel) {
+          let dateText = "";
+
+          const candidates = [
+            dateLabel.nextElementSibling,
+            dateLabel.parentElement?.nextElementSibling,
+            dateLabel.closest("table")?.querySelector("tbody tr td:last-child"),
+            dateLabel.closest("table")?.querySelector("tbody tr td"),
+            dateLabel.closest("div")?.querySelector("td:last-child"),
+            dateLabel.closest("div")?.querySelector("td"),
+          ];
+
+          for (const node of candidates) {
+            if (!node?.innerText) continue;
+            const match = node.innerText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
+            if (match) {
+              dateText = match[1];
+              break;
+            }
+          }
+
+          if (!dateText) {
+            const ancestorText =
+              dateLabel.closest("table")?.innerText ||
+              dateLabel.parentElement?.innerText ||
+              "";
+            const match = ancestorText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
+            if (match) {
+              dateText = match[1];
+            }
+          }
+
+          if (dateText) {
+            dateCompra = dateText;
+          }
+        }
+
         // Formato atual (MG e outros estados que usam o mesmo sistema)
         const rows = document.querySelectorAll('tr');
         rows.forEach(row => {
@@ -81,9 +148,6 @@ export default function MainScreen() {
             let finalQty = 1;
             let finalUnitPrice = totalPrice;
 
-            // Se for unidade exata (UN, CX, PT) e for um número inteiro, 
-            // rateamos a quantidade. Caso contrário (KG, L ou quantidade quebrada), 
-            // tratamos como "1 pacote" daquele peso no valor total.
             if (Number.isInteger(qtyRaw) && qtyRaw > 0 && unitMeasure !== 'KG' && unitMeasure !== 'L') {
               finalQty = qtyRaw;
               finalUnitPrice = totalPrice / qtyRaw;
@@ -134,17 +198,23 @@ export default function MainScreen() {
           });
         }
         
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ITEMS_FOUND', data: items }));
+        // Envia os itens, o nome do mercado e a data para o App
+        window.ReactNativeWebView.postMessage(JSON.stringify({ 
+          type: 'ITEMS_FOUND', 
+          data: items,
+          marketName: marketName,
+          dateCompra: dateCompra
+        }));
       } catch(err) {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: err.toString() }));
       }
-    }, 4000); // Aumentado para 4s para garantir que o portal carregue
+    }, 4000); // 4s para garantir que o portal carregue
     true;
   `;
 
   if (isScanning) {
     return (
-      <Container>
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
         <CameraView
           style={{ flex: 1 }}
           onBarcodeScanned={scannedUrl ? undefined : handleBarCodeScanned}
@@ -160,7 +230,7 @@ export default function MainScreen() {
             <ScanText>Aponte para o QR Code da nota fiscal</ScanText>
           </CameraOverlay>
         </CameraView>
-      </Container>
+      </View>
     );
   }
 
@@ -175,23 +245,21 @@ export default function MainScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(9, 9, 11, 0.7)", // Backdrop escuro moderno (zinc-950 com opacidade)
+            backgroundColor: "rgba(9, 9, 11, 0.7)",
             alignItems: "center",
             justifyContent: "center",
             padding: 24,
           }}
         >
-          {/* Card do Modal Centralizado */}
           <View
             style={{
               backgroundColor: "#FFFFFF",
               width: "100%",
-              maxWidth: 340, // Garante que não fique gigante em telas largas
+              maxWidth: 340,
               borderRadius: 24,
               padding: 32,
               alignItems: "center",
               justifyContent: "center",
-              // Sombras elegantes para dar profundidade (iOS & Android)
               shadowColor: "#000000",
               shadowOffset: { width: 0, height: 8 },
               shadowOpacity: 0.15,
@@ -229,13 +297,12 @@ export default function MainScreen() {
               Aguarde enquanto extraímos os produtos do cupom...
             </ScanText>
 
-            {/* Botão de Cancelar Reformulado */}
             <TouchableOpacity
               onPress={() => setScannedUrl(null)}
               style={{
                 marginTop: 28,
                 width: "100%",
-                height: 48, // Tamanho ideal para toque
+                height: 48,
                 backgroundColor: "#F4F4F5",
                 borderRadius: 14,
                 alignItems: "center",
@@ -252,7 +319,6 @@ export default function MainScreen() {
               </ScanText>
             </TouchableOpacity>
 
-            {/* WebView Invisível de processamento mantido intacto */}
             <View
               style={{ height: 0, width: 0, opacity: 0, position: "absolute" }}
             >
@@ -268,7 +334,6 @@ export default function MainScreen() {
       )}
 
       <ScrollContent showsVerticalScrollIndicator={false}>
-        {/* Cabeçalho */}
         <Header>
           <HeaderTextGroup>
             <Title>Nova Compra</Title>
@@ -278,7 +343,6 @@ export default function MainScreen() {
           </HeaderTextGroup>
         </Header>
 
-        {/* Área Central (Ações Principais) */}
         <CenterArea>
           <MainCard>
             <IconWrapper>
@@ -298,7 +362,6 @@ export default function MainScreen() {
           </MainCard>
         </CenterArea>
 
-        {/* Rodapé (Perfis Ativos) */}
         <Footer>
           <FooterLabel>Perfis ativos</FooterLabel>
           <ProfilesRow>
@@ -316,7 +379,6 @@ export default function MainScreen() {
     </Container>
   );
 }
-
 // --- Styled Components ---
 
 const Container = styled(SafeAreaView)`
@@ -441,30 +503,6 @@ const PrimaryButtonText = styled.Text`
   font-size: 16px;
   color: #ffffff;
   letter-spacing: 0.3px;
-`;
-
-const SecondaryButton = styled.TouchableOpacity`
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  padding-vertical: 16px;
-  background-color: #ffffff;
-  border-radius: 16px;
-  border-width: 1px;
-  border-color: #e4e4e7;
-  gap: 8px;
-
-  shadow-color: #000;
-  shadow-offset: 0px 2px;
-  shadow-opacity: 0.03;
-  shadow-radius: 4px;
-  elevation: 2;
-`;
-
-const SecondaryButtonText = styled.Text`
-  font-weight: 700;
-  font-size: 15px;
-  color: #52525b;
 `;
 
 const Footer = styled.View`

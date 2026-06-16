@@ -19,7 +19,11 @@ interface AppContextType {
   historyEntries: HistoryEntry[];
   setHistoryEntries: React.Dispatch<React.SetStateAction<HistoryEntry[]>>;
   loadMockData: () => void;
-  isHydrated: boolean; // Controla se a leitura inicial terminou
+  isHydrated: boolean;
+  scrapedMarket: string;
+  setScrapedMarket: React.Dispatch<React.SetStateAction<string>>;
+  scrapedDate: string;
+  setScrapedDate: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -33,7 +37,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allocs, setAllocs] = useState<Allocations>({});
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  // 1. Estado que avisa o restante do app (telas e rotas) que os dados já foram carregados
+  // 🔥 CORREÇÃO: Os estados agora estão no lugar certo (dentro do AppProvider)
+  const [scrapedMarket, setScrapedMarket] = useState("");
+  const [scrapedDate, setScrapedDate] = useState("");
+
+  // Controla se a leitura inicial terminou
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Trava interna síncrona para impedir os useEffects de salvamento na inicialização
@@ -42,10 +50,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // 1. CARREGA OS DADOS DO DISPOSITIVO AO INICIAR
   useEffect(() => {
     const loadAllData = async () => {
+      console.log("AppProvider: start loadAllData");
       try {
         const [storedHistory, storedProfiles] = await Promise.all([
           AsyncStorage.getItem(HISTORY_KEY),
           AsyncStorage.getItem(PROFILES_KEY),
+          new Promise((resolve) => setTimeout(resolve, 600)), // Mínimo de 0.6s garantido
         ]);
 
         if (storedHistory) {
@@ -57,11 +67,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.error("Erro ao carregar dados do AsyncStorage", e);
       } finally {
-        // Coloca no fim da fila de execução do JS.
-        // Garante que o React renderizou tudo e os estados estão consolidados.
         setTimeout(() => {
           isLoaded.current = true;
-          setIsHydrated(true); // Libera as rotas de navegação com segurança
+          setIsHydrated(true);
         }, 50);
       }
     };
@@ -71,10 +79,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // 2. SALVA O HISTÓRICO APENAS APÓS O CARREGAMENTO INICIAL
   useEffect(() => {
-    if (!isLoaded.current) return; // 🛑 Bloqueado se ainda estiver iniciando
+    if (!isLoaded.current) return;
 
     const saveHistory = async () => {
       try {
+        console.log(
+          "AppProvider: saving history, count=",
+          historyEntries.length,
+        );
         await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(historyEntries));
       } catch (e) {
         console.error("Erro ao salvar histórico", e);
@@ -85,10 +97,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // 3. SALVA OS PERFIS APENAS APÓS O CARREGAMENTO INICIAL
   useEffect(() => {
-    if (!isLoaded.current) return; // 🛑 Bloqueado se ainda estiver iniciando
+    if (!isLoaded.current) return;
 
     const saveProfiles = async () => {
       try {
+        console.log("AppProvider: saving profiles, count=", profiles.length);
         await AsyncStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
       } catch (e) {
         console.error("Erro ao salvar perfis", e);
@@ -116,7 +129,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         historyEntries,
         setHistoryEntries,
         loadMockData,
-        isHydrated, // Enviado para o Contexto
+        isHydrated,
+        scrapedMarket,
+        setScrapedMarket,
+        scrapedDate,
+        setScrapedDate,
       }}
     >
       {children}

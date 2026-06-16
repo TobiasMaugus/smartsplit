@@ -44,11 +44,19 @@ const computeShares = (
 };
 
 export default function SummaryScreen() {
-  const { profiles, allocs, items, historyEntries, setHistoryEntries } =
-    useAppContext();
+  const {
+    profiles,
+    allocs,
+    items,
+    historyEntries,
+    setHistoryEntries,
+    scrapedMarket, // 🔥 Puxado do Contexto Global
+    scrapedDate, // 🔥 Puxado do Contexto Global
+  } = useAppContext();
+
   const [payerId, setPayerId] = useState<string | null>(null);
   const [showPix, setShowPix] = useState(false);
-  const [wasSavedToHistory, setWasSavedToHistory] = useState(false); // 🔥 Evita duplicar no histórico
+  const [wasSavedToHistory, setWasSavedToHistory] = useState(false);
 
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
@@ -61,7 +69,7 @@ export default function SummaryScreen() {
 
   // 1. Função Centralizada de Salvamento
   const checkAndSaveToHistory = (currentPayer: Profile) => {
-    if (wasSavedToHistory) return; // Se já salvou nesta sessão, não faz nada
+    if (wasSavedToHistory) return;
 
     const newEntry = {
       id: `h${Date.now()}`,
@@ -71,23 +79,29 @@ export default function SummaryScreen() {
       desc: others
         .map((o) => `${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
         .join(", "),
+
+      // 🔥 Salva invisivelmente os dados do WebScraping no banco de dados
+      marketName: scrapedMarket || "Supermercado",
+      dateCompra: scrapedDate || new Date().toLocaleDateString("pt-BR"),
     };
-    setHistoryEntries([newEntry, ...historyEntries].slice(0, 3));
-    setWasSavedToHistory(true); // Bloqueia novos salvamentos duplicados
+
+    // 🔥 Limite de histórico alterado para as últimas 10 compras
+    setHistoryEntries([newEntry, ...historyEntries].slice(0, 15));
+    setWasSavedToHistory(true);
   };
 
   // 2. Ação: Salvar e Voltar direto
   const handleSaveAndExit = () => {
     if (!payer) return;
     checkAndSaveToHistory(payer);
-    router.replace("/(tabs)/");
+    router.replace("/(tabs)");
   };
 
   // 3. Ação: Compartilhar
   const shareAndClose = async () => {
     if (!payer) return;
 
-    checkAndSaveToHistory(payer); // Salva no histórico ao compartilhar
+    checkAndSaveToHistory(payer);
 
     const pixKey = payer.pixKey || "";
     const pixName = payer.pixName || payer.name;
@@ -102,6 +116,7 @@ export default function SummaryScreen() {
 
     const message = [
       `💰 Rateio Concluído!`,
+      scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "", // 🔥 Mostra o mercado no WhatsApp
       `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
       `Pagador: ${payer.name}`,
       ``,
@@ -116,16 +131,16 @@ export default function SummaryScreen() {
     try {
       await Share.share({ message });
     } catch (e) {
-      // Usuário cancelou o compartilhamento
+      // Utilizador cancelou a partilha
     }
 
-    router.replace("/(tabs)/");
+    router.replace("/(tabs)");
   };
 
   // 4. Ação: Gerar Pix
   const handleOpenPix = () => {
     if (!payer) return;
-    checkAndSaveToHistory(payer); // Salva no histórico ao gerar Pix
+    checkAndSaveToHistory(payer);
     setShowPix(true);
   };
 
@@ -161,7 +176,7 @@ export default function SummaryScreen() {
                 key={p.id}
                 onPress={() => {
                   setPayerId(p.id);
-                  setWasSavedToHistory(false); // Reseta a trava caso mude o pagador antes de fechar
+                  setWasSavedToHistory(false);
                 }}
                 activeOpacity={0.7}
                 $isActive={payerId === p.id}
@@ -225,7 +240,6 @@ export default function SummaryScreen() {
               </OwningBox>
             </Card>
 
-            {/* 🔥 NOVO BOTÃO: Salvar e Voltar */}
             <InlineSaveButton onPress={handleSaveAndExit} activeOpacity={0.85}>
               <Save size={18} color="#10B981" />
               <InlineSaveText>Salvar e Voltar</InlineSaveText>
@@ -259,7 +273,7 @@ export default function SummaryScreen() {
           >
             <Share2 size={18} color={payerId ? "#FFFFFF" : "#A1A1AA"} />
             <ActionText $variant={payerId ? "dark" : "disabled"}>
-              Compartilhar
+              Partilhar
             </ActionText>
           </ActionButton>
 
@@ -553,7 +567,6 @@ const EmptyPayerText = styled.Text`
   flex: 1;
 `;
 
-// 🔥 Novos estilos do botão "Salvar e Voltar" alinhado ao design limpo do app
 const InlineSaveButton = styled.TouchableOpacity`
   background-color: #ffffff;
   border-width: 1px;
