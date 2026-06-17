@@ -1,6 +1,8 @@
 import { router } from "expo-router";
 import { AlertCircle, ChevronRight, Pencil, Wallet } from "lucide-react-native";
 import React from "react";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
@@ -8,8 +10,11 @@ import { useAppContext } from "../../context/AppContext";
 export default function ProfilesScreen() {
   const { profiles } = useAppContext();
 
+  // Pegamos os limites seguros da tela do celular para igualar com history.tsx
+  const insets = useSafeAreaInsets();
+
   return (
-    <Container>
+    <Container style={{ paddingTop: insets.top }}>
       {/* showsVerticalScrollIndicator={false} deixa a rolagem mais limpa visualmente */}
       <ScrollContainer showsVerticalScrollIndicator={false}>
         {/* Cabeçalho */}
@@ -66,21 +71,27 @@ export default function ProfilesScreen() {
 
 // --- Styled Components ---
 
-const Container = styled.SafeAreaView`
+// Substituímos o SafeAreaView por View comum (igual no history.tsx)
+const Container = styled(View)`
   flex: 1;
-  background-color: #F8FAFC;
+  background-color: #f8fafc;
 `;
 
-const ScrollContainer = styled.ScrollView`
+// Aplicamos o espaçamento no contentContainerStyle para refletir o mesmo alinhamento
+const ScrollContainer = styled.ScrollView.attrs({
+  contentContainerStyle: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
+  },
+})`
   flex: 1;
-  padding-top: 32px;
-  padding-left: 24px;
-  padding-right: 24px;
 `;
 
+// Removemos o margin-top: 8px que estava desalinhando a altura em relação ao history
 const Header = styled.View`
   margin-bottom: 32px;
-  margin-top: 8px;
 `;
 
 const Title = styled.Text`
@@ -92,7 +103,7 @@ const Title = styled.Text`
 
 const Subtitle = styled.Text`
   font-size: 16px;
-  color: #6B7280;
+  color: #6b7280;
   margin-top: 6px;
   font-weight: 500;
 `;
