@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { QrCode, X } from "lucide-react-native";
+import { QrCode, Sun, X } from "lucide-react-native";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +21,7 @@ export default function MainScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
+  const [isTorchOn, setIsTorchOn] = useState(false);
 
   const onScan = async () => {
     if (!permission?.granted) {
@@ -237,11 +238,46 @@ export default function MainScreen() {
           barcodeScannerSettings={{
             barcodeTypes: ["qr"],
           }}
+          enableTorch={isTorchOn}
         >
           <CameraOverlay>
-            <CloseCameraButton onPress={() => setIsScanning(false)}>
+            {/* 1. BOTÃO DA LANTERNA (Topo Esquerdo) */}
+            <TouchableOpacity
+              onPress={() => setIsTorchOn(!isTorchOn)}
+              style={{
+                position: "absolute",
+                top: 50,
+                left: 24,
+                width: 44,
+                height: 44,
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: 22,
+                // 🔥 ALTERADO: Quando desligada, o fundo fica mais escuro (0.6) para igualar ao outro botão
+                backgroundColor: isTorchOn
+                  ? "rgba(255, 255, 255, 0.3)"
+                  : "rgba(0, 0, 0, 0.6)",
+                zIndex: 10,
+              }}
+            >
+              <Sun size={24} color={isTorchOn ? "#FFCC00" : "#FFFFFF"} />
+            </TouchableOpacity>
+
+            {/* 2. BOTÃO DE FECHAR (Topo Direito) */}
+            <CloseCameraButton
+              onPress={() => setIsScanning(false)}
+              style={{
+                position: "absolute",
+                top: 50,
+                right: 24,
+                margin: 0,
+                zIndex: 10,
+              }}
+            >
               <X size={24} color="#FFFFFF" />
             </CloseCameraButton>
+
+            {/* Componentes centrais */}
             <ScanArea />
             <ScanText>Aponte para o QR Code da nota fiscal</ScanText>
           </CameraOverlay>
