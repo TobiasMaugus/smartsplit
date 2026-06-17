@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { QrCode, Sun, X } from "lucide-react-native";
+import { QrCode, X, Zap } from "lucide-react-native";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,14 +10,8 @@ import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
 
 export default function MainScreen() {
-  const {
-    profiles,
-    loadMockData,
-    items,
-    setItems,
-    setScrapedMarket,
-    setScrapedDate,
-  } = useAppContext();
+  const { profiles, setItems, setScrapedMarket, setScrapedDate } =
+    useAppContext();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
@@ -260,7 +254,7 @@ export default function MainScreen() {
                 zIndex: 10,
               }}
             >
-              <Sun size={24} color={isTorchOn ? "#FFCC00" : "#FFFFFF"} />
+              <Zap size={24} color={isTorchOn ? "#FFCC00" : "#FFFFFF"} />
             </TouchableOpacity>
 
             {/* 2. BOTÃO DE FECHAR (Topo Direito) */}

@@ -31,6 +31,7 @@ export interface HistoryEntry {
   desc: string;
   marketName?: string;
   dateCompra?: string;
+  horarioCompra?: string;
 }
 
 export const COLORS = [
@@ -42,6 +43,7 @@ export const COLORS = [
   "#E91E63",
   "#1976D2",
   "#F4511E",
+  "#FFD166",
 ];
 
 export const COLLECTIVE = "__collective__";

@@ -98,6 +98,8 @@ export default function SummaryScreen() {
   };
 
   // 3. Ação: Compartilhar
+  // 3. Ação: Compartilhar
+  // 3. Ação: Compartilhar
   const shareAndClose = async () => {
     if (!payer) return;
 
@@ -110,23 +112,30 @@ export default function SummaryScreen() {
       ? generatePixBRCode(pixKey, owingTotal, pixName, pixCity)
       : "";
 
-    const debtLines = others
-      .map((o) => `• ${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
-      .join("\n");
+    const debtLines = others.map(
+      (o) => `• ${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`,
+    );
 
-    const message = [
+    // Separamos o bloco de resumo do bloco do Pix Copia e Cola
+    const messageBlock = [
       `💰 Divisão Concluída!`,
-      scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "", // 🔥 Mostra o mercado no WhatsApp
+      scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "",
       `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
       `Pagador: ${payer.name} \n`,
-      ``,
+      `Chave PIX: ${payer.pixKey} \n`,
       debtLines,
-      ``,
-      pixKey ? `📋 Pix Copia e Cola:` : "",
-      pixKey ? emvCode : "",
     ]
       .filter(Boolean)
       .join("\n");
+
+    // 🔥 Geramos o link codificado de forma segura para o seu site do GitHub Pages
+    const safePixCode = encodeURIComponent(emvCode);
+    const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
+
+    // 🔥 Montamos o texto final com o Link do site LOGO ACIMA do código copia e cola tradicional
+    const message = pixKey
+      ? `${messageBlock}\n\n🔗 *Pagar pelo Navegador (QR Code):*\n${pixLink}\n\n` // 📋 *Pix Copia e Cola (Toque para copiar):*\n\`\`\`${emvCode}\`\`\`
+      : messageBlock;
 
     try {
       await Share.share({ message });
