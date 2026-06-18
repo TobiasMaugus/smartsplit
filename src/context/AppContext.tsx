@@ -24,6 +24,8 @@ interface AppContextType {
   setScrapedMarket: React.Dispatch<React.SetStateAction<string>>;
   scrapedDate: string;
   setScrapedDate: React.Dispatch<React.SetStateAction<string>>;
+  scrapedTime: string;
+  setScrapedTime: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -40,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // 🔥 CORREÇÃO: Os estados agora estão no lugar certo (dentro do AppProvider)
   const [scrapedMarket, setScrapedMarket] = useState("");
   const [scrapedDate, setScrapedDate] = useState("");
+  const [scrapedTime, setScrapedTime] = useState("");
 
   // Controla se a leitura inicial terminou
   const [isHydrated, setIsHydrated] = useState(false);
@@ -134,6 +137,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setScrapedMarket,
         scrapedDate,
         setScrapedDate,
+        scrapedTime,
+        setScrapedTime,
       }}
     >
       {children}

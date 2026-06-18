@@ -12,6 +12,7 @@ import { useAppContext } from "../../context/AppContext";
 export default function MainScreen() {
   const { profiles, setItems, setScrapedMarket, setScrapedDate } =
     useAppContext();
+  const { setScrapedTime } = useAppContext();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export default function MainScreen() {
           `[WebScraping] Sucesso! ${msg.data.length} itens encontrados.`,
         );
         console.log(
-          `[WebScraping] Mercado: ${msg.marketName} | Data: ${msg.dateCompra}`,
+          `[WebScraping] Mercado: ${msg.marketName} | Data: ${msg.dateCompra} | Hora: ${msg.horarioCompra}`,
         );
 
         if (msg.data.length > 0) {
@@ -55,6 +56,7 @@ export default function MainScreen() {
 
           setScrapedMarket(msg.marketName || "");
           setScrapedDate(msg.dateCompra || "");
+          setScrapedTime(msg.horarioCompra || "");
 
           setScannedUrl(null);
           router.push("/processing");
@@ -115,22 +117,26 @@ export default function MainScreen() {
           sendLog("   -> Aviso: Mercado não encontrado, usará o fallback.");
         }
 
-        // --- 2. DATA DA COMPRA ---
-        sendLog("2. Buscando a data de emissão...");
+        // --- 2. DATA / HORÁRIO DA COMPRA ---
+        sendLog("2. Buscando a data e horário de emissão...");
         let dateCompra = new Date().toLocaleDateString("pt-BR");
+        let horarioCompra = "";
         const htmlContent = document.body.innerHTML;
-        
-        const dateMatch = htmlContent.match(/(?:Emiss[aã]o|Data)[^0-9]*?(\\d{2}\\/\\d{2}\\/\\d{4})/i);
 
-        if (dateMatch && dateMatch[1]) {
-          dateCompra = dateMatch[1];
-          sendLog("   -> Sucesso! Data encontrada (Regex 1): " + dateCompra);
+        // Tenta capturar: 23/05/2026 17:06:01 ou 23/05/2026 17:06
+        const dateTimeMatch = htmlContent.match(/(?:Emiss[aã]o|Data)[^0-9]*?(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/i);
+
+        if (dateTimeMatch && dateTimeMatch[1]) {
+          dateCompra = dateTimeMatch[1];
+          if (dateTimeMatch[2]) horarioCompra = dateTimeMatch[2];
+          sendLog("   -> Sucesso! Data encontrada (Regex 1): " + dateCompra + (horarioCompra ? " " + horarioCompra : ""));
         } else {
-          sendLog("   -> Aviso: Regex principal falhou, tentando Fallback secundário...");
-          const qualquerDataMatch = htmlContent.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
+          sendLog("   -> Aviso: Regex principal falhou, tentando Fallback secundário para data/hora...");
+          const qualquerDataMatch = htmlContent.match(/(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/);
           if (qualquerDataMatch) {
             dateCompra = qualquerDataMatch[1];
-            sendLog("   -> Sucesso! Data encontrada (Fallback Secundário): " + dateCompra);
+            if (qualquerDataMatch[2]) horarioCompra = qualquerDataMatch[2];
+            sendLog("   -> Sucesso! Data encontrada (Fallback Secundário): " + dateCompra + (horarioCompra ? " " + horarioCompra : ""));
           } else {
             sendLog("   -> Erro: Nenhuma data encontrada na página. Usará a data de hoje.");
           }
@@ -213,7 +219,8 @@ export default function MainScreen() {
           type: 'ITEMS_FOUND', 
           data: items,
           marketName: marketName,
-          dateCompra: dateCompra
+          dateCompra: dateCompra,
+          horarioCompra: horarioCompra
         }));
       } catch(err) {
         sendLog("ERRO CRÍTICO: " + err.toString());

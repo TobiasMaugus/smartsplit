@@ -32,6 +32,7 @@ export interface HistoryEntry {
   marketName?: string;
   dateCompra?: string;
   horarioCompra?: string;
+  horario?: string;
 }
 
 export const COLORS = [

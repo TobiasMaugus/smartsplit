@@ -47,7 +47,11 @@ export default function HistoryScreen() {
                       </MarketTitle>
 
                       {/* 🕒 DATA 1: Registro de quando foi processado no App */}
-                      <DateText>App: {e.date}</DateText>
+                      <DateText numberOfLines={1}>
+                        App: {e.date}
+                        {/* @ts-ignore */}
+                        {e.horario ? ` às ${e.horario}` : null}
+                      </DateText>
                     </TopRow>
 
                     {/* Valor total da compra */}
@@ -60,9 +64,11 @@ export default function HistoryScreen() {
 
                     {/* 📅 DATA 2: Exibe a data real APENAS se for diferente de hoje */}
                     {showPurchaseDate ? (
-                      <PurchaseDateText>
+                      <PurchaseDateText numberOfLines={1}>
                         📅 Nota de: {/* @ts-ignore */}
                         {e.dateCompra}
+                        {/* @ts-ignore */}
+                        {e.horarioCompra ? ` às ${e.horarioCompra}` : null}
                       </PurchaseDateText>
                     ) : null}
                   </CardBody>

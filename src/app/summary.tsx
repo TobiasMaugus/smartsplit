@@ -52,6 +52,7 @@ export default function SummaryScreen() {
     setHistoryEntries,
     scrapedMarket, // 🔥 Puxado do Contexto Global
     scrapedDate, // 🔥 Puxado do Contexto Global
+    scrapedTime,
   } = useAppContext();
 
   const [payerId, setPayerId] = useState<string | null>(null);
@@ -83,6 +84,11 @@ export default function SummaryScreen() {
       // 🔥 Salva invisivelmente os dados do WebScraping no banco de dados
       marketName: scrapedMarket || "Supermercado",
       dateCompra: scrapedDate || new Date().toLocaleDateString("pt-BR"),
+      horarioCompra: scrapedTime || "",
+      horario: new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
     // 🔥 Limite de histórico alterado para as últimas 10 compras
