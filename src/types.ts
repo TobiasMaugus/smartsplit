@@ -33,6 +33,10 @@ export interface HistoryEntry {
   dateCompra?: string;
   horarioCompra?: string;
   horario?: string;
+  // Lista completa de itens que pertencem a esta compra
+  items?: GroceryItem[];
+  // Mapeamento de alocação por item: allocs[itemId][profileId] = unidades
+  allocs?: Allocations;
 }
 
 export const COLORS = [

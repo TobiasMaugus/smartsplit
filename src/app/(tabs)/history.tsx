@@ -1,14 +1,19 @@
+import { useRouter } from "expo-router";
+import { ChevronRight } from "lucide-react-native";
 import React from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
+import LogoSvg from "../../assets/Group1.svg";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
+import { HistoryEntry } from "../../types";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 export default function HistoryScreen() {
   const { historyEntries } = useAppContext();
+  const router = useRouter();
 
   // Pegamos os limites seguros da tela do celular (como a barra de status no topo)
   const insets = useSafeAreaInsets();
@@ -18,8 +23,21 @@ export default function HistoryScreen() {
     <Container style={{ paddingTop: insets.top }}>
       <ScrollContent showsVerticalScrollIndicator={false}>
         {/* Cabeçalho */}
-        <Header>
-          <Title>Últimas Compras</Title>
+        <Header style={{ position: "relative", justifyContent: "center" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingRight: 48,
+            }}
+          >
+            <Title>Últimas Compras</Title>
+          </View>
+          <LogoSvg
+            width={34}
+            height={34}
+            style={{ position: "absolute", right: 4, top: -15 }}
+          />
           <Subtitle>Exibe as últimas compras realizadas.</Subtitle>
         </Header>
 
@@ -28,55 +46,78 @@ export default function HistoryScreen() {
           {historyEntries.length === 0 ? (
             <EmptyText>Nenhum histórico disponível.</EmptyText>
           ) : (
-            historyEntries.map((e, i) => {
+            historyEntries.map((e: HistoryEntry, i) => {
               // 🔥 REGRA INTELIGENTE: Só mostra a data da nota se ela for DIFERENTE da data do App
               // @ts-ignore
               const showPurchaseDate = e.dateCompra && e.dateCompra !== e.date;
 
               return (
-                <Card key={e.id}>
-                  <Avatar name={e.payer.name} color={e.payer.color} size="md" />
+                <Pressable
+                  key={e.id}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/history-details/[id]",
+                      params: { id: e.id },
+                    })
+                  }
+                  accessibilityRole="button"
+                >
+                  <Card>
+                    <Avatar
+                      name={e.payer.name}
+                      color={e.payer.color}
+                      size="md"
+                    />
 
-                  <CardBody>
-                    <TopRow>
-                      {/* Nome do Mercado */}
-                      {/* @ts-ignore */}
-                      <MarketTitle numberOfLines={1}>
+                    <CardBody>
+                      <TopRow>
+                        {/* Nome do Mercado agora ocupa toda a largura da linha */}
                         {/* @ts-ignore */}
-                        {e.marketName || "Supermercado"}
-                      </MarketTitle>
+                        <MarketTitle numberOfLines={1}>
+                          {/* @ts-ignore */}
+                          {e.marketName || "Supermercado"}
+                        </MarketTitle>
+                      </TopRow>
 
-                      {/* 🕒 DATA 1: Registro de quando foi processado no App */}
-                      <DateText numberOfLines={1}>
-                        App: {e.date}
-                        {/* @ts-ignore */}
-                        {e.horario ? ` às ${e.horario}` : null}
-                      </DateText>
-                    </TopRow>
+                      {/* Valor total da compra */}
+                      <PriceText>{fmt(e.total)}</PriceText>
 
-                    {/* Valor total da compra */}
-                    <PriceText>{fmt(e.total)}</PriceText>
+                      {/* Fluxo de pagamento verticalizado */}
+                      <SplitDetailsContainer>
+                        <PayerText numberOfLines={1}>
+                          {e.payer.name.split(" ")[0]} pagou tudo
+                        </PayerText>
+                        <DebtorText numberOfLines={1}>• {e.desc}</DebtorText>
+                      </SplitDetailsContainer>
 
-                    {/* Descrição do rateio de quem deve quem */}
-                    <DescText numberOfLines={1}>
-                      {e.payer.name.split(" ")[0]} pagou · {e.desc}
-                    </DescText>
+                      {/* Bloco de datas alinhado perfeitamente à esquerda */}
+                      <DatesContainer>
+                        <DateText numberOfLines={1}>
+                          📱 App: {e.date}
+                          {/* @ts-ignore */}
+                          {e.horario ? ` às ${e.horario}` : null}
+                        </DateText>
 
-                    {/* 📅 DATA 2: Exibe a data real APENAS se for diferente de hoje */}
-                    {showPurchaseDate ? (
-                      <PurchaseDateText numberOfLines={1}>
-                        📅 Nota de: {/* @ts-ignore */}
-                        {e.dateCompra}
-                        {/* @ts-ignore */}
-                        {e.horarioCompra ? ` às ${e.horarioCompra}` : null}
-                      </PurchaseDateText>
-                    ) : null}
-                  </CardBody>
+                        {/* 📅 DATA 2: Exibe a data real APENAS se for diferente de hoje */}
+                        {showPurchaseDate ? (
+                          <PurchaseDateText numberOfLines={1}>
+                            📅 Nota: {/* @ts-ignore */}
+                            {e.dateCompra}
+                            {/* @ts-ignore */}
+                            {e.horarioCompra ? ` às ${e.horarioCompra}` : null}
+                          </PurchaseDateText>
+                        ) : null}
+                      </DatesContainer>
+                    </CardBody>
 
-                  <IndexBadge>
-                    <IndexText>#{historyEntries.length - i}</IndexText>
-                  </IndexBadge>
-                </Card>
+                    <RightSide>
+                      <IndexBadge>
+                        <IndexText>#{historyEntries.length - i}</IndexText>
+                      </IndexBadge>
+                      <ChevronRight size={20} color="#D4D4D8" />
+                    </RightSide>
+                  </Card>
+                </Pressable>
               );
             })
           )}
@@ -90,7 +131,6 @@ export default function HistoryScreen() {
 
 // --- Styled Components ---
 
-// Substituímos o SafeAreaView por View comum para eliminar a margem branca no fundo
 const Container = styled(View)`
   flex: 1;
   background-color: #f4f6f9;
@@ -164,7 +204,6 @@ const CardBody = styled.View`
 const TopRow = styled.View`
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 2px;
 `;
 
@@ -173,38 +212,63 @@ const MarketTitle = styled.Text`
   font-weight: 800;
   color: #18181b;
   flex: 1;
-  margin-right: 8px;
 `;
 
 const PriceText = styled.Text`
   font-size: 16px;
   font-weight: 700;
   color: #10b981;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+`;
+
+const SplitDetailsContainer = styled.View`
+  gap: 2px;
+  margin-bottom: 8px;
+`;
+
+const PayerText = styled.Text`
+  font-size: 12px;
+  color: #4b5563;
+  font-weight: 600;
+`;
+
+const DebtorText = styled.Text`
+  font-size: 12px;
+  color: #71717a;
+  font-weight: 500;
+`;
+
+const DatesContainer = styled.View`
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 `;
 
 const DateText = styled.Text`
   font-size: 11px;
   font-weight: 600;
   color: #a1a1aa;
-`;
-
-const DescText = styled.Text`
-  font-size: 12px;
-  color: #71717a;
-  font-weight: 500;
+  background-color: #f4f6f9;
+  padding-vertical: 2px;
+  padding-horizontal: 6px;
+  border-radius: 6px;
 `;
 
 const PurchaseDateText = styled.Text`
   font-size: 11px;
   font-weight: 600;
   color: #71717a;
-  margin-top: 6px;
-  background-color: #f4f6f9;
+  background-color: #eef2f7;
   padding-vertical: 2px;
   padding-horizontal: 6px;
   border-radius: 6px;
-  align-self: flex-start;
+`;
+
+const RightSide = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 `;
 
 const IndexBadge = styled.View`

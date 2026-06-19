@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import {
   CheckCircle2,
+  ChevronLeft,
   Minus,
   Plus,
   RotateCcw,
@@ -8,7 +9,7 @@ import {
   Users,
   X,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
@@ -28,6 +29,7 @@ export default function ProcessingScreen() {
   const {
     profiles,
     items,
+    allocs: globalAllocs,
     setItems,
     setAllocs: setGlobalAllocs,
   } = useAppContext();
@@ -40,15 +42,41 @@ export default function ProcessingScreen() {
   const mkRemaining = () =>
     Object.fromEntries(items.map((i) => [i.id, i.totalUnits]));
 
+  const buildRemainingFromAllocs = (allocsSource: Allocations) =>
+    Object.fromEntries(
+      items.map((item) => {
+        const assigned = Object.values(allocsSource[item.id] ?? {}).reduce(
+          (sum, units) => sum + units,
+          0,
+        );
+        return [item.id, Math.max(0, item.totalUnits - assigned)];
+      }),
+    );
+
   const [remaining, setRemaining] =
     useState<Record<string, number>>(mkRemaining);
-  const [allocs, setAllocs] = useState<Allocations>({});
+  const [allocs, setAllocs] = useState<Allocations>(globalAllocs ?? {});
   const [curIdx, setCurIdx] = useState(0);
   const [qty, setQty] = useState(1);
   const [personalizado, setPersonalizado] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [isScrollable, setIsScrollable] = useState(false);
+
+  useEffect(() => {
+    const initialAllocs = Object.keys(globalAllocs).length ? globalAllocs : {};
+    setAllocs(initialAllocs);
+    setRemaining(buildRemainingFromAllocs(initialAllocs));
+
+    const nextItemIndex = items.findIndex(
+      (item) => buildRemainingFromAllocs(initialAllocs)[item.id] > 0,
+    );
+    setCurIdx(nextItemIndex >= 0 ? nextItemIndex : 0);
+    setSelected([]);
+    setQty(1);
+    setPersonalizado(false);
+    setUndoStack([]);
+  }, [items, globalAllocs]);
 
   const cur = items[curIdx];
   const rem = cur ? (remaining[cur.id] ?? 0) : 0;
@@ -156,19 +184,28 @@ export default function ProcessingScreen() {
   return (
     <Container>
       <TopPanel>
-        <TopRow>
+        {/* LInha 1: Navegação (Voltar e Cancelar) */}
+        <HeaderActions>
+          <BackButton onPress={() => router.back()} activeOpacity={0.7}>
+            <ChevronLeft size={20} color="#A1A1AA" />
+            <BackText>Voltar</BackText>
+          </BackButton>
+
+          <CancelButton onPress={onCancelPurchase} activeOpacity={0.6}>
+            <X size={18} color="#A1A1AA" />
+          </CancelButton>
+        </HeaderActions>
+
+        {/* Linha 2: Informações (Total e Progresso) */}
+        <HeaderInfo>
           <TotalText>Total: {fmt(PURCHASE_TOTAL)}</TotalText>
-          <RightActions>
-            <ProgressLabel>
-              {allDone
-                ? "Concluído ✓"
-                : `Item ${doneCount + 1} de ${items.length}`}
-            </ProgressLabel>
-            <CancelButton onPress={onCancelPurchase} activeOpacity={0.6}>
-              <X size={18} color="#A1A1AA" />
-            </CancelButton>
-          </RightActions>
-        </TopRow>
+          <ProgressLabel>
+            {allDone
+              ? "Concluído ✓"
+              : `Item ${doneCount + 1} de ${items.length}`}
+          </ProgressLabel>
+        </HeaderInfo>
+
         <ProgressTrack>
           <ProgressFill style={{ width: `${pct}%` }} />
         </ProgressTrack>
@@ -442,29 +479,30 @@ const Container = styled(SafeAreaView)`
 
 const TopPanel = styled.View`
   background-color: #ffffff;
-  padding: 16px 24px 12px 24px;
+  padding: 16px 24px 16px 24px;
   border-bottom-width: 1px;
   border-bottom-color: #e4e4e7;
   z-index: 10;
 `;
 
-const TopRow = styled.View`
+const HeaderActions = styled.View`
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 `;
 
-const TotalText = styled.Text`
-  font-size: 19px;
-  font-weight: 900;
-  color: #18181b;
-`;
-
-const RightActions = styled.View`
+const BackButton = styled.TouchableOpacity`
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
+  /* Removido o margin-bottom que causava o desalinhamento */
+`;
+
+const BackText = styled.Text`
+  color: #a1a1aa;
+  font-size: 16px;
+  font-weight: 600;
 `;
 
 const CancelButton = styled.TouchableOpacity`
@@ -476,10 +514,24 @@ const CancelButton = styled.TouchableOpacity`
   justify-content: center;
 `;
 
+const HeaderInfo = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+`;
+
+const TotalText = styled.Text`
+  font-size: 22px;
+  font-weight: 900;
+  color: #18181b;
+`;
+
 const ProgressLabel = styled.Text`
-  font-size: 15px;
-  font-weight: 800;
-  color: #a1a1aa;
+  font-size: 14px;
+  font-weight: 700;
+  color: #71717a;
+  margin-bottom: 2px;
 `;
 
 const ProgressTrack = styled.View`
@@ -532,11 +584,10 @@ const DoneSubtitle = styled.Text`
   font-weight: 500;
 `;
 
-// 🔥 Card Dinâmico: Aumenta o espaçamento interno se houver apenas 2 perfis
 const Card = styled.View<{ $isSpacious?: boolean }>`
   background-color: #ffffff;
   border-radius: 20px;
-  padding: ${({ $isSpacious }) => ($isSpacious ? "32px 24px" : "20px 24px")};
+  padding: ${({ $isSpacious }) => ($isSpacious ? "23px" : "20px 24px")};
   border-width: 1px;
   border-color: #f4f4f5;
   shadow-color: #000;
@@ -555,7 +606,6 @@ const CardLabel = styled.Text`
   margin-bottom: 6px;
 `;
 
-// 🔥 Título Dinâmico
 const ItemTitle = styled.Text<{ $isSpacious?: boolean }>`
   font-size: ${({ $isSpacious }) => ($isSpacious ? "26px" : "22px")};
   font-weight: 900;
@@ -668,7 +718,6 @@ const AvatarItem = styled.TouchableOpacity`
   gap: 6px;
 `;
 
-// 🔥 Avatar e textos aumentam se isTwoProfiles
 const AvatarCircle = styled.View<{
   $isSelected: boolean;
   $isSpacious?: boolean;

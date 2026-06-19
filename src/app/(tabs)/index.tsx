@@ -6,6 +6,8 @@ import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import styled from "styled-components/native";
+import LogoSvg from "../../assets/Group1.svg";
+import LogoSvg2 from "../../assets/Group2.svg";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
 
@@ -214,13 +216,17 @@ export default function MainScreen() {
           sendLog("   -> Produtos encontrados usando Fallback Secundário: " + items.length);
         }
         
+        // --- LÓGICA DE SALVAMENTO AJUSTADA ---
+        // Se houver um horário capturado (ex: "17:06:01"), extrai apenas os 5 primeiros caracteres ("17:06")
+        let finalHorario = horarioCompra ? horarioCompra.trim().slice(0, 5) : "";
+
         sendLog("4. Extração concluída. Enviando dados ao React Native...");
         window.ReactNativeWebView.postMessage(JSON.stringify({ 
           type: 'ITEMS_FOUND', 
           data: items,
           marketName: marketName,
           dateCompra: dateCompra,
-          horarioCompra: horarioCompra
+          horarioCompra: finalHorario
         }));
       } catch(err) {
         sendLog("ERRO CRÍTICO: " + err.toString());
@@ -320,9 +326,20 @@ export default function MainScreen() {
               elevation: 8,
             }}
           >
+            {/* Definir uma largura e altura numéricas fixas resolve o bug do espaço fantasma. 
+        Ajuste o height abaixo proporcionalmente ao design do seu LogoSvg2 (ex: se for mais horizontal, algo entre 40 e 60 funciona perfeitamente).
+      */}
+            <LogoSvg2
+              width={180}
+              height={50}
+              style={{
+                marginBottom: 24,
+              }}
+            />
+
             <ActivityIndicator
               size="large"
-              color="#10B981"
+              color="#6C63FF"
               style={{ transform: [{ scale: 1.2 }] }}
             />
 
@@ -387,13 +404,18 @@ export default function MainScreen() {
       )}
 
       <ScrollContent showsVerticalScrollIndicator={false}>
-        <Header>
-          <HeaderTextGroup>
+        <Header style={{ position: "relative" }}>
+          <HeaderTextGroup style={{ paddingRight: 48 }}>
             <Title>Nova Compra</Title>
             <Subtitle>
               Automatize a leitura da nota fiscal e divida o valor rapidamente.
             </Subtitle>
           </HeaderTextGroup>
+          <LogoSvg
+            width={34}
+            height={34}
+            style={{ position: "absolute", right: 4, top: -15 }}
+          />
         </Header>
 
         <CenterArea>

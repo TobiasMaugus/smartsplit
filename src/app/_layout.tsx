@@ -103,6 +103,7 @@ function RootLayoutNav() {
       <Stack.Screen name="setup" options={{ presentation: "modal" }} />
       <Stack.Screen name="processing" />
       <Stack.Screen name="summary" />
+      <Stack.Screen name="history-details/[id]" />
     </Stack>
   );
 }

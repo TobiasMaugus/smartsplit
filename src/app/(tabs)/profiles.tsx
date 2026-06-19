@@ -4,6 +4,7 @@ import React from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
+import LogoSvg from "../../assets/Group1.svg";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
 
@@ -18,8 +19,23 @@ export default function ProfilesScreen() {
       {/* showsVerticalScrollIndicator={false} deixa a rolagem mais limpa visualmente */}
       <ScrollContainer showsVerticalScrollIndicator={false}>
         {/* Cabeçalho */}
-        <Header>
-          <Title>Seus Perfis</Title>
+        {/* Cabeçalho */}
+        {/* Cabeçalho */}
+        <Header style={{ position: "relative", justifyContent: "center" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingRight: 48,
+            }}
+          >
+            <Title>Seus Perfis</Title>
+          </View>
+          <LogoSvg
+            width={34}
+            height={34}
+            style={{ position: "absolute", right: 4, top: -15 }}
+          />
           <Subtitle>Gerencie quem participa das divisões.</Subtitle>
         </Header>
 

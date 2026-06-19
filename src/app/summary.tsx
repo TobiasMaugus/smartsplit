@@ -7,14 +7,14 @@ import {
   ShoppingBag,
   User,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
 import { PixModal } from "../components/PixModal";
 import { useAppContext } from "../context/AppContext";
-import { Allocations, Profile } from "../types";
+import { Allocations, GroceryItem, HistoryEntry, Profile } from "../types";
 import { generatePixBRCode } from "../utils/pix";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
@@ -22,7 +22,7 @@ const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 const computeShares = (
   allocs: Allocations,
   profiles: Profile[],
-  items: any[],
+  items: GroceryItem[],
 ): Record<string, number> => {
   const s: Record<string, number> = {};
   profiles.forEach((p) => {
@@ -53,6 +53,8 @@ export default function SummaryScreen() {
     scrapedMarket, // 🔥 Puxado do Contexto Global
     scrapedDate, // 🔥 Puxado do Contexto Global
     scrapedTime,
+    editingEntry,
+    setEditingEntry,
   } = useAppContext();
 
   const [payerId, setPayerId] = useState<string | null>(null);
@@ -71,17 +73,16 @@ export default function SummaryScreen() {
   // 1. Função Centralizada de Salvamento
   const checkAndSaveToHistory = (currentPayer: Profile) => {
     if (wasSavedToHistory) return;
+    const quantidadeHistorico = 15;
 
-    const newEntry = {
-      id: `h${Date.now()}`,
+    const baseEntry: HistoryEntry = {
+      id: editingEntry ? editingEntry.id : `h${Date.now()}`,
       date: new Date().toLocaleDateString("pt-BR"),
       total: PURCHASE_TOTAL,
       payer: currentPayer,
       desc: others
         .map((o) => `${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`)
         .join(", "),
-
-      // 🔥 Salva invisivelmente os dados do WebScraping no banco de dados
       marketName: scrapedMarket || "Supermercado",
       dateCompra: scrapedDate || new Date().toLocaleDateString("pt-BR"),
       horarioCompra: scrapedTime || "",
@@ -89,12 +90,34 @@ export default function SummaryScreen() {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      // Persistimos a lista de itens e a alocação atual
+      items: items,
+      allocs: allocs,
     };
 
-    // 🔥 Limite de histórico alterado para as últimas 10 compras
-    setHistoryEntries([newEntry, ...historyEntries].slice(0, 15));
+    if (editingEntry) {
+      // Sobrescreve o histórico existente
+      setHistoryEntries((prev) =>
+        prev.map((h) => (h.id === baseEntry.id ? baseEntry : h)),
+      );
+      setEditingEntry(null);
+    } else {
+      // Novo histórico
+      setHistoryEntries(
+        [baseEntry, ...historyEntries].slice(0, quantidadeHistorico),
+      );
+    }
+
     setWasSavedToHistory(true);
   };
+
+  // Quando entramos em modo de edição, preenchermos o pagador automaticamente
+  useEffect(() => {
+    if (editingEntry) {
+      setPayerId(editingEntry.payer.id);
+      setWasSavedToHistory(false);
+    }
+  }, [editingEntry]);
 
   // 2. Ação: Salvar e Voltar direto
   const handleSaveAndExit = () => {

@@ -1,0 +1,555 @@
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ChevronLeft } from "lucide-react-native";
+import React, { useState } from "react";
+import { Modal, ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import styled from "styled-components/native";
+import { Avatar } from "../../components/Avatar";
+import { useAppContext } from "../../context/AppContext";
+import { COLLECTIVE, GroceryItem } from "../../types";
+
+export default function HistoryDetail() {
+  const params = useLocalSearchParams();
+  const { id } = params as { id?: string };
+  const router = useRouter();
+  const { historyEntries, profiles, deleteHistoryEntry, restoreHistoryEntry } =
+    useAppContext();
+
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+
+  // Estado para controlar o filtro ativo (null = Todos, COLLECTIVE = Ambos, ou o ID do perfil)
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+
+  const entry = historyEntries.find((h) => h.id === id);
+
+  if (!entry) {
+    return (
+      <Container>
+        <Header>
+          <BackButton onPress={() => router.back()} activeOpacity={0.7}>
+            <ChevronLeft size={20} color="#A1A1AA" />
+            <BackText>Voltar</BackText>
+          </BackButton>
+        </Header>
+        <Body>
+          <EmptyText>Histórico não encontrado.</EmptyText>
+        </Body>
+      </Container>
+    );
+  }
+
+  const confirmDelete = () => {
+    deleteHistoryEntry(entry.id);
+    setIsDeleteModalVisible(false);
+    router.replace("/(tabs)");
+  };
+
+  const handleEdit = () => {
+    restoreHistoryEntry(entry);
+    router.push("/processing");
+  };
+
+  // Filtra os itens com base no botão selecionado
+  const filteredItems =
+    entry.items?.filter((it: GroceryItem) => {
+      if (!selectedFilter) return true; // Mostrar Todos
+      const alloc = entry.allocs?.[it.id] ?? {};
+      return alloc[selectedFilter] !== undefined && alloc[selectedFilter] > 0;
+    }) ?? [];
+
+  return (
+    <Container>
+      <Header>
+        <View style={{ width: "100%", alignItems: "center", marginBottom: 24 }}>
+          <Title>Detalhes da Compra</Title>
+        </View>
+
+        <BackButton onPress={() => router.back()} activeOpacity={0.7}>
+          <ChevronLeft size={20} color="#A1A1AA" />
+          <BackText>Voltar</BackText>
+        </BackButton>
+      </Header>
+
+      <Scroll>
+        <Top>
+          <Avatar name={entry.payer.name} color={entry.payer.color} size="lg" />
+          <TopInfo>
+            <Market>{entry.marketName || "Supermercado"}</Market>
+            <Meta>
+              <MetaText>{entry.date}</MetaText>
+              {entry.horario ? <MetaText>às {entry.horario}</MetaText> : null}
+            </Meta>
+            <Total>R$ {entry.total.toFixed(2).replace(".", ",")}</Total>
+          </TopInfo>
+        </Top>
+
+        <Divider />
+
+        {/* --- Barra Horizontal de Filtros --- */}
+        <FilterScrollWrapper>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 24, gap: 8 }}
+          >
+            <FilterPill
+              $active={selectedFilter === null}
+              onPress={() => setSelectedFilter(null)}
+              activeOpacity={0.7}
+            >
+              <FilterPillText $active={selectedFilter === null}>
+                Todos
+              </FilterPillText>
+            </FilterPill>
+
+            <FilterPill
+              $active={selectedFilter === COLLECTIVE}
+              onPress={() => setSelectedFilter(COLLECTIVE)}
+              activeOpacity={0.7}
+            >
+              <FilterPillText $active={selectedFilter === COLLECTIVE}>
+                Ambos
+              </FilterPillText>
+            </FilterPill>
+
+            {profiles.map((p) => (
+              <FilterPill
+                key={p.id}
+                $active={selectedFilter === p.id}
+                onPress={() => setSelectedFilter(p.id)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: p.color,
+                  }}
+                />
+                <FilterPillText $active={selectedFilter === p.id}>
+                  {p.name.split(" ")[0]}
+                </FilterPillText>
+              </FilterPill>
+            ))}
+          </ScrollView>
+        </FilterScrollWrapper>
+
+        <Section>
+          <SectionTitle>
+            Itens da Compra {selectedFilter && `(${filteredItems.length})`}
+          </SectionTitle>
+          {filteredItems.length > 0 ? (
+            filteredItems.map((it: GroceryItem) => {
+              const alloc = entry.allocs?.[it.id] ?? {};
+              const allocEntries = Object.entries(alloc);
+
+              return (
+                <ItemRow key={it.id}>
+                  <ItemHeader>
+                    <ItemName numberOfLines={1}>{it.name}</ItemName>
+                    <ItemUnitPrice>
+                      R$ {it.unitPrice.toFixed(2).replace(".", ",")} / un
+                    </ItemUnitPrice>
+                  </ItemHeader>
+
+                  <AllocationsWrapper>
+                    {allocEntries.map(([pid, units]) => {
+                      const isShared = pid === COLLECTIVE;
+                      const cost = units * it.unitPrice;
+
+                      if (isShared) {
+                        return (
+                          <AllocRow key={COLLECTIVE}>
+                            <SharedBadge>
+                              <SharedBadgeText>Ambos</SharedBadgeText>
+                            </SharedBadge>
+                            <AllocText>
+                              {units} {units === 1 ? "unidade" : "unidades"} ·
+                              R$ {cost.toFixed(2).replace(".", ",")}
+                            </AllocText>
+                          </AllocRow>
+                        );
+                      }
+
+                      const profile = profiles.find((p) => p.id === pid);
+                      if (!profile) return null;
+
+                      return (
+                        <AllocRow key={pid}>
+                          <Avatar
+                            name={profile.name}
+                            color={profile.color}
+                            size="xs"
+                          />
+                          <AllocText>
+                            {profile.name.split(" ")[0]} · {units}{" "}
+                            {units === 1 ? "unidade" : "unidades"} · R${" "}
+                            {cost.toFixed(2).replace(".", ",")}
+                          </AllocText>
+                        </AllocRow>
+                      );
+                    })}
+                  </AllocationsWrapper>
+                </ItemRow>
+              );
+            })
+          ) : (
+            <EmptyText>Nenhum item encontrado para este filtro.</EmptyText>
+          )}
+        </Section>
+
+        <Spacing />
+      </Scroll>
+
+      <Footer>
+        <DangerButton
+          onPress={() => setIsDeleteModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <DangerText>Excluir Compra</DangerText>
+        </DangerButton>
+
+        <PrimaryButton onPress={handleEdit} activeOpacity={0.85}>
+          <PrimaryText>Refazer Divisão</PrimaryText>
+        </PrimaryButton>
+      </Footer>
+
+      {/* Modal Customizado de Confirmação de Exclusão */}
+      <Modal
+        visible={isDeleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteModalVisible(false)}
+      >
+        <ModalOverlay>
+          <ModalContent>
+            <ModalTitle>Excluir histórico</ModalTitle>
+            <ModalSubtitle>
+              Tem certeza que deseja excluir este histórico? Esta ação não
+              poderá ser desfeita.
+            </ModalSubtitle>
+
+            <ActionButtonsContainer>
+              <ModalCancelButton
+                onPress={() => setIsDeleteModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <ModalCancelText>Cancelar</ModalCancelText>
+              </ModalCancelButton>
+
+              <ModalDeleteButton onPress={confirmDelete} activeOpacity={0.7}>
+                <ModalDeleteText>Excluir</ModalDeleteText>
+              </ModalDeleteButton>
+            </ActionButtonsContainer>
+          </ModalContent>
+        </ModalOverlay>
+      </Modal>
+    </Container>
+  );
+}
+
+// ==========================================
+// STYLED COMPONENTS (Limpos e sem duplicação)
+// ==========================================
+
+const Container = styled(SafeAreaView)`
+  flex: 1;
+  background-color: #f4f6f9;
+`;
+
+const Header = styled.View`
+  padding: 20px 24px 8px 24px;
+`;
+
+const Title = styled.Text`
+  font-size: 32px;
+  font-weight: 900;
+  color: #18181b;
+  letter-spacing: -0.5px;
+  line-height: 38px;
+  text-align: center;
+`;
+
+const BackButton = styled.TouchableOpacity`
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+`;
+
+const BackText = styled.Text`
+  color: #a1a1aa;
+  font-size: 16px;
+  font-weight: 600;
+`;
+
+const Scroll = styled.ScrollView.attrs({
+  contentContainerStyle: { paddingHorizontal: 24, paddingBottom: 24 },
+})`
+  flex: 1;
+`;
+
+const Body = styled.View`
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+`;
+
+const Top = styled.View`
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+`;
+
+const TopInfo = styled.View``;
+
+const Market = styled.Text`
+  font-size: 16px;
+  font-weight: 800;
+  color: #18181b;
+`;
+
+const Meta = styled.View`
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 6px;
+`;
+
+const MetaText = styled.Text`
+  font-size: 12px;
+  color: #71717a;
+  font-weight: 600;
+`;
+
+const Total = styled.Text`
+  font-size: 20px;
+  font-weight: 900;
+  color: #10b981;
+  margin-top: 6px;
+`;
+
+const Divider = styled.View`
+  height: 1px;
+  background-color: #eef2f7;
+  margin-vertical: 16px;
+`;
+
+// --- Estilos da Nova Barra de Filtros ---
+const FilterScrollWrapper = styled.View`
+  margin-horizontal: -24px;
+  margin-bottom: 20px;
+`;
+
+const FilterPill = styled.TouchableOpacity<{ $active: boolean }>`
+  padding: 8px 16px;
+  border-radius: 999px;
+  background-color: ${({ $active }) => ($active ? "#18181B" : "#FFFFFF")};
+  border-width: 1px;
+  border-color: ${({ $active }) => ($active ? "#18181B" : "#E4E4E7")};
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+`;
+
+const FilterPillText = styled.Text<{ $active: boolean }>`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${({ $active }) => ($active ? "#FFFFFF" : "#71717A")};
+`;
+// ----------------------------------------
+
+const Section = styled.View``;
+
+const SectionTitle = styled.Text`
+  font-size: 13px;
+  font-weight: 800;
+  color: #18181b;
+  margin-bottom: 8px;
+`;
+
+const ItemRow = styled.View`
+  padding-vertical: 12px;
+  border-bottom-width: 1px;
+  border-bottom-color: #eef2f7;
+`;
+
+const ItemHeader = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+`;
+
+const ItemName = styled.Text`
+  font-size: 14px;
+  font-weight: 700;
+  color: #18181b;
+  flex: 1;
+  margin-right: 12px;
+`;
+
+const ItemUnitPrice = styled.Text`
+  font-size: 13px;
+  font-weight: 600;
+  color: #a1a1aa;
+`;
+
+const AllocationsWrapper = styled.View`
+  gap: 6px;
+`;
+
+const AllocRow = styled.View`
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+`;
+
+const AllocText = styled.Text`
+  font-size: 12px;
+  color: #71717a;
+  font-weight: 500;
+`;
+
+const SharedBadge = styled.View`
+  background-color: #e0f2fe;
+  padding: 4px 8px;
+  border-radius: 999px;
+`;
+
+const SharedBadgeText = styled.Text`
+  font-size: 10px;
+  font-weight: 800;
+  color: #0284c7;
+  text-transform: uppercase;
+`;
+
+const EmptyText = styled.Text`
+  font-size: 14px;
+  color: #a1a1aa;
+  margin-top: 8px;
+`;
+
+const Spacing = styled.View`
+  height: 20px;
+`;
+
+const Footer = styled.View`
+  flex-direction: row;
+  gap: 12px;
+  padding: 12px 24px 24px 24px;
+`;
+
+const PrimaryButton = styled.TouchableOpacity`
+  flex: 1;
+  background-color: #10b981;
+  padding: 14px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const PrimaryText = styled.Text`
+  color: #ffffff;
+  font-weight: 800;
+`;
+
+const DangerButton = styled.TouchableOpacity`
+  background-color: #fff;
+  border-width: 1px;
+  border-color: #ff4757;
+  padding: 14px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const DangerText = styled.Text`
+  color: #ff4757;
+  font-weight: 800;
+`;
+
+// --- Styled Components do Novo Modal de Exclusão ---
+
+const ModalOverlay = styled.View`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(9, 9, 11, 0.7);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+`;
+
+const ModalContent = styled.View`
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 340px;
+  border-radius: 24px;
+  padding: 32px;
+  align-items: center;
+  justify-content: center;
+
+  shadow-color: #000000;
+  shadow-offset: 0px 8px;
+  shadow-opacity: 0.15;
+  shadow-radius: 16px;
+  elevation: 8;
+`;
+
+const ModalTitle = styled.Text`
+  color: #18181b;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+`;
+
+const ModalSubtitle = styled.Text`
+  color: #71717a;
+  margin-top: 8px;
+  font-size: 13px;
+  text-align: center;
+  line-height: 18px;
+  margin-bottom: 24px;
+`;
+
+const ActionButtonsContainer = styled.View`
+  flex-direction: row;
+  width: 100%;
+  gap: 12px;
+`;
+
+const ModalCancelButton = styled.TouchableOpacity`
+  flex: 1;
+  height: 48px;
+  background-color: #f4f4f5;
+  border-radius: 14px;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-color: #e4e4e7;
+`;
+
+const ModalCancelText = styled.Text`
+  color: #71717a;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const ModalDeleteButton = styled.TouchableOpacity`
+  flex: 1;
+  height: 48px;
+  background-color: #ef4444;
+  border-radius: 14px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ModalDeleteText = styled.Text`
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+`;
