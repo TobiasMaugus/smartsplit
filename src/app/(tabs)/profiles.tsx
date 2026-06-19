@@ -1,6 +1,8 @@
+import * as LocalAuthentication from "expo-local-authentication";
 import { router, useFocusEffect } from "expo-router";
 import {
   AlertCircle,
+  ChevronDown,
   ChevronRight,
   FolderGit2,
   Globe,
@@ -21,47 +23,42 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
-import Group2Svg from "../../assets/Group2.svg"; // Novo logo para o modal
+import Group2Svg from "../../assets/Group2.svg";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
 
 export default function ProfilesScreen() {
-  // ATENÇÃO: Adicione a função `clearAllData` (ou equivalente) no seu AppContext
-  // para fazer a exclusão real dos dados no banco/storage.
   const { profiles, clearAllData } = useAppContext();
   const insets = useSafeAreaInsets();
 
-  // --- ESTADOS DOS MODAIS ---
+  // --- ESTADOS ---
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [isResetConfirmModalVisible, setIsResetConfirmModalVisible] =
     useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false); // Apenas visual por enquanto
+  const [expandedProfileId, setExpandedProfileId] = useState<string | null>(
+    null,
+  );
 
   // --- LÓGICA DA ANIMAÇÃO AO ENTRAR NA ABA ---
-  // --- CONTROLE DE ROTAÇÃO CONTÍNUA SEM FLASH ---
-  const rotationValue = useSharedValue(0); // Controla os graus (0, 180, 360, 540...)
-  const isSettingsVisible = useSharedValue(0); // 0 = Logo visível, 1 = Engrenagem visível
+  const rotationValue = useSharedValue(0);
+  const isSettingsVisible = useSharedValue(0);
 
   useFocusEffect(
     useCallback(() => {
-      // Estado inicial ao entrar na aba: gira para a engrenagem
       rotationValue.value = withTiming(180, { duration: 600 });
       isSettingsVisible.value = withTiming(1, { duration: 600 });
 
       const interval = setInterval(() => {
-        // A cada 5s, soma mais 180 graus (sempre para a frente)
         rotationValue.value = withTiming(rotationValue.value + 180, {
           duration: 600,
         });
 
-        // Alterna o alvo da opacidade (0 ou 1)
         const nextTarget = isSettingsVisible.value === 0 ? 1 : 0;
         isSettingsVisible.value = withTiming(nextTarget, { duration: 600 });
       }, 5000);
 
       return () => {
         clearInterval(interval);
-        // Reseta para o estado inicial ao sair da aba
         rotationValue.value = 0;
         isSettingsVisible.value = 0;
       };
@@ -70,18 +67,14 @@ export default function ProfilesScreen() {
 
   const logoAnimatedStyle = useAnimatedStyle(() => {
     return {
-      // Ambos os ícones giram juntos exatamente no mesmo ângulo contínuo
       transform: [{ rotate: `${rotationValue.value}deg` }],
-      // O logo fica visível quando isSettingsVisible tende a 0
       opacity: interpolate(isSettingsVisible.value, [0, 0.5, 1], [1, 0, 0]),
     };
   });
 
   const settingsAnimatedStyle = useAnimatedStyle(() => {
     return {
-      // Ambos os ícones giram juntos exatamente no mesmo ângulo contínuo
       transform: [{ rotate: `${rotationValue.value}deg` }],
-      // A engrenagem fica visível quando isSettingsVisible tende a 1
       opacity: interpolate(isSettingsVisible.value, [0, 0.5, 1], [0, 0, 1]),
     };
   });
@@ -89,7 +82,7 @@ export default function ProfilesScreen() {
   // --- FUNÇÕES DE AÇÃO ---
   const handleResetData = () => {
     if (clearAllData) {
-      clearAllData(); // Chama a função do seu contexto para limpar tudo
+      clearAllData();
     }
     setIsResetConfirmModalVisible(false);
     setIsSettingsModalVisible(false);
@@ -100,14 +93,45 @@ export default function ProfilesScreen() {
   };
 
   const openPortfolio = () => {
-    // Substitua pela URL real do seu portfólio
     Linking.openURL("https://portfolio-ten-ashy-46.vercel.app/");
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedProfileId(expandedProfileId === id ? null : id);
+  };
+
+  // 💡 Lógica para exigir Autenticação Local antes de editar
+  const handleEditProfiles = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (hasHardware && isEnrolled) {
+        const authResult = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Autentique-se para editar os perfis",
+          fallbackLabel: "Usar senha",
+        });
+
+        if (authResult.success) {
+          router.push("/setup");
+        } else {
+          // Usuário cancelou ou errou, encerra a ação
+          return;
+        }
+      } else {
+        // Dispositivo sem biometria/senha cadastrada, libera a edição
+        router.push("/setup");
+      }
+    } catch (error) {
+      console.error("Erro ao autenticar:", error);
+      // Fallback seguro em caso de erro na biblioteca
+      router.push("/setup");
+    }
   };
 
   return (
     <Container style={{ paddingTop: insets.top }}>
       <ScrollContainer showsVerticalScrollIndicator={false}>
-        {/* Cabeçalho */}
         <Header style={{ position: "relative", justifyContent: "center" }}>
           <View
             style={{
@@ -119,7 +143,6 @@ export default function ProfilesScreen() {
             <Title>Seus Perfis</Title>
           </View>
 
-          {/* Botão que abre o modal de configurações */}
           <Pressable
             onPress={() => setIsSettingsModalVisible(true)}
             style={{
@@ -148,37 +171,85 @@ export default function ProfilesScreen() {
           <Subtitle>Gerencie quem participa das divisões.</Subtitle>
         </Header>
 
-        {/* Lista de Perfis */}
+        {/* 💡 Lista de Perfis com cards expansíveis */}
         <ProfilesList>
-          {profiles.map((p) => (
-            <ProfileCard key={p.id}>
-              <ColorIndicator style={{ backgroundColor: p.color }} />
-              <Avatar name={p.name} color={p.color} size="lg" />
+          {profiles.map((p) => {
+            const isExpanded = expandedProfileId === p.id;
 
-              <ProfileInfo>
-                <ProfileName>{p.name}</ProfileName>
-                {p.pixKey ? (
-                  <PixBadge>
-                    <Wallet size={12} color="#059669" />
-                    <PixText numberOfLines={1}>{p.pixKey}</PixText>
-                  </PixBadge>
-                ) : (
-                  <NoPixBadge>
-                    <AlertCircle size={12} color="#ea580c" />
-                    <NoPixText>Sem Pix</NoPixText>
-                  </NoPixBadge>
+            return (
+              <ProfileCard
+                key={p.id}
+                onPress={() => toggleExpand(p.id)}
+                activeOpacity={0.7}
+              >
+                <ColorIndicator style={{ backgroundColor: p.color }} />
+
+                <ProfileCardTop>
+                  <Avatar name={p.name} color={p.color} size="lg" />
+
+                  <ProfileInfo>
+                    <ProfileName>{p.name}</ProfileName>
+                    {p.pixKey ? (
+                      <PixBadge>
+                        <Wallet size={12} color="#059669" />
+                        <PixText numberOfLines={1}>Com Pix</PixText>
+                      </PixBadge>
+                    ) : (
+                      <NoPixBadge>
+                        <AlertCircle size={12} color="#ea580c" />
+                        <NoPixText>Sem Pix</NoPixText>
+                      </NoPixBadge>
+                    )}
+                  </ProfileInfo>
+
+                  <ActionIconWrapper>
+                    {isExpanded ? (
+                      <ChevronDown size={20} color="#6b7280" />
+                    ) : (
+                      <ChevronRight size={20} color="#9CA3AF" />
+                    )}
+                  </ActionIconWrapper>
+                </ProfileCardTop>
+
+                {isExpanded && (
+                  <ProfileExpandedContent>
+                    <ExpandedDivider />
+                    {p.pixKey ? (
+                      <ExpandedDetails>
+                        <DetailGroup>
+                          <DetailLabel>Chave Pix</DetailLabel>
+                          <DetailValue>{p.pixKey}</DetailValue>
+                        </DetailGroup>
+
+                        {p.pixName && (
+                          <DetailGroup>
+                            <DetailLabel>Nome do Titular</DetailLabel>
+                            <DetailValue>{p.pixName}</DetailValue>
+                          </DetailGroup>
+                        )}
+
+                        {p.pixCity && (
+                          <DetailGroup>
+                            <DetailLabel>Cidade</DetailLabel>
+                            <DetailValue>{p.pixCity}</DetailValue>
+                          </DetailGroup>
+                        )}
+                      </ExpandedDetails>
+                    ) : (
+                      <EmptyDetailsText>
+                        Nenhum dado de transferência cadastrado para este
+                        perfil.
+                      </EmptyDetailsText>
+                    )}
+                  </ProfileExpandedContent>
                 )}
-              </ProfileInfo>
-
-              {/* <ActionIconWrapper>
-                <ChevronRight size={20} color="#9CA3AF" />
-              </ActionIconWrapper> */}
-            </ProfileCard>
-          ))}
+              </ProfileCard>
+            );
+          })}
         </ProfilesList>
 
         <BottomAction>
-          <EditButton onPress={() => router.push("/setup")} activeOpacity={0.8}>
+          <EditButton onPress={handleEditProfiles} activeOpacity={0.8}>
             <Pencil size={18} color="#FFFFFF" />
             <EditButtonText>Editar Perfis</EditButtonText>
           </EditButton>
@@ -204,10 +275,7 @@ export default function ProfilesScreen() {
                 height: 48,
               }}
             >
-              {/* Botão invisível do mesmo tamanho do fechar para garantir centralização perfeita */}
               <View style={{ width: 40, height: 40 }} />
-
-              {/* Contêiner centralizado que limita o tamanho máximo do logo */}
               <View
                 style={{
                   flex: 1,
@@ -218,7 +286,6 @@ export default function ProfilesScreen() {
               >
                 <Group2Svg width={180} height={45} />
               </View>
-
               <CloseButton
                 onPress={() => setIsSettingsModalVisible(false)}
                 style={{
@@ -233,23 +300,7 @@ export default function ProfilesScreen() {
             </SettingsHeader>
 
             <SettingsBody>
-              {/* <SettingRow>
-                <SettingRowLeft>
-                  <SettingIconWrapper>
-                    <Moon size={20} color="#18181b" />
-                  </SettingIconWrapper>
-                  <SettingLabel>Modo Escuro</SettingLabel>
-                </SettingRowLeft>
-                <Switch
-                  value={isDarkMode}
-                  onValueChange={setIsDarkMode}
-                  trackColor={{ false: "#e4e4e7", true: "#6C63FF" }}
-                  thumbColor="#ffffff"
-                />
-              </SettingRow> */}
-
               <SettingDivider />
-
               <SettingRow onPress={() => setIsResetConfirmModalVisible(true)}>
                 <SettingRowLeft>
                   <SettingIconDanger>
@@ -301,7 +352,6 @@ export default function ProfilesScreen() {
               Tem certeza que deseja apagar todos os perfis e o histórico de
               compras? Esta ação não poderá ser desfeita.
             </ConfirmSubtitle>
-
             <ActionButtonsContainer>
               <ModalCancelButton
                 onPress={() => setIsResetConfirmModalVisible(false)}
@@ -309,7 +359,6 @@ export default function ProfilesScreen() {
               >
                 <ModalCancelText>Cancelar</ModalCancelText>
               </ModalCancelButton>
-
               <ModalDeleteButton onPress={handleResetData} activeOpacity={0.7}>
                 <ModalDeleteText>Apagar Tudo</ModalDeleteText>
               </ModalDeleteButton>
@@ -363,13 +412,11 @@ const ProfilesList = styled.View`
   gap: 16px;
 `;
 
-const ProfileCard = styled.View`
+// O card principal agora é interativo e em coluna
+const ProfileCard = styled.TouchableOpacity`
   background-color: #ffffff;
   border-radius: 24px;
   padding: 20px;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
   border-width: 1px;
   border-color: #f9fafb;
   shadow-color: #000;
@@ -377,13 +424,21 @@ const ProfileCard = styled.View`
   shadow-opacity: 0.04;
   shadow-radius: 12px;
   elevation: 2;
+  position: relative;
+`;
+
+// A parte superior mantém o layout de linha que existia antes
+const ProfileCardTop = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
 `;
 
 const ColorIndicator = styled.View`
   position: absolute;
   left: 0;
-  top: 24px;
-  bottom: 24px;
+  top: 20px;
+  bottom: 20px;
   width: 6px;
   border-top-right-radius: 9999px;
   border-bottom-right-radius: 9999px;
@@ -448,6 +503,53 @@ const ActionIconWrapper = styled.View`
   justify-content: center;
 `;
 
+// 💡 Novos componentes para a área expandida
+const ProfileExpandedContent = styled.View`
+  margin-top: 16px;
+  padding-left: 4px;
+`;
+
+const ExpandedDivider = styled.View`
+  height: 1px;
+  background-color: #f3f4f6;
+  margin-bottom: 16px;
+`;
+
+const ExpandedDetails = styled.View`
+  gap: 12px;
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border-width: 1px;
+  border-color: #f1f5f9;
+`;
+
+const DetailGroup = styled.View`
+  gap: 2px;
+`;
+
+const DetailLabel = styled.Text`
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const DetailValue = styled.Text`
+  font-size: 15px;
+  color: #334155;
+  font-weight: 600;
+`;
+
+const EmptyDetailsText = styled.Text`
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+  font-style: italic;
+  margin-top: 4px;
+`;
+
 const BottomAction = styled.View`
   margin-top: 32px;
   padding-bottom: 48px;
@@ -477,7 +579,7 @@ const EditButtonText = styled.Text`
 `;
 
 // ==========================================
-// STYLED COMPONENTS - MODAL DE CONFIGURAÇÕES
+// STYLED COMPONENTS - MODAIS (MANTIDOS ORIGINAIS)
 // ==========================================
 
 const SettingsOverlay = styled.View`
@@ -605,10 +707,6 @@ const FooterTextHighlight = styled.Text`
   color: #18181b;
   font-weight: 700;
 `;
-
-// ==========================================
-// STYLED COMPONENTS - MODAL DE CONFIRMAÇÃO
-// ==========================================
 
 const ConfirmOverlay = styled.View`
   flex: 1;
