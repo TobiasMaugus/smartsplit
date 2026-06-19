@@ -4,16 +4,12 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
-  FolderGit2,
-  Globe,
   Pencil,
   Settings,
-  Trash2,
   Wallet,
-  X,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { Linking, Modal, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -23,8 +19,8 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
-import Group2Svg from "../../assets/Group2.svg";
 import { Avatar } from "../../components/Avatar";
+import { SettingsModal } from "../../components/SettingsModal";
 import { useAppContext } from "../../context/AppContext";
 
 export default function ProfilesScreen() {
@@ -33,8 +29,6 @@ export default function ProfilesScreen() {
 
   // --- ESTADOS ---
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
-  const [isResetConfirmModalVisible, setIsResetConfirmModalVisible] =
-    useState(false);
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(
     null,
   );
@@ -80,22 +74,6 @@ export default function ProfilesScreen() {
   });
 
   // --- FUNÇÕES DE AÇÃO ---
-  const handleResetData = () => {
-    if (clearAllData) {
-      clearAllData();
-    }
-    setIsResetConfirmModalVisible(false);
-    setIsSettingsModalVisible(false);
-  };
-
-  const openGithub = () => {
-    Linking.openURL("https://github.com/TobiasMaugus");
-  };
-
-  const openPortfolio = () => {
-    Linking.openURL("https://portfolio-ten-ashy-46.vercel.app/");
-  };
-
   const toggleExpand = (id: string) => {
     setExpandedProfileId(expandedProfileId === id ? null : id);
   };
@@ -255,117 +233,10 @@ export default function ProfilesScreen() {
           </EditButton>
         </BottomAction>
       </ScrollContainer>
-
-      {/* ========================================== */}
-      {/* MODAL DE CONFIGURAÇÕES */}
-      {/* ========================================== */}
-      <Modal
+      <SettingsModal
         visible={isSettingsModalVisible}
-        transparent
-        animationType="slide"
         onRequestClose={() => setIsSettingsModalVisible(false)}
-      >
-        <SettingsOverlay>
-          <SettingsSheet style={{ paddingBottom: insets.bottom || 24 }}>
-            <SettingsHeader
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                height: 48,
-              }}
-            >
-              <View style={{ width: 40, height: 40 }} />
-              <View
-                style={{
-                  flex: 1,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                }}
-              >
-                <Group2Svg width={180} height={45} />
-              </View>
-              <CloseButton
-                onPress={() => setIsSettingsModalVisible(false)}
-                style={{
-                  width: 40,
-                  height: 40,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <X size={24} color="#71717a" />
-              </CloseButton>
-            </SettingsHeader>
-
-            <SettingsBody>
-              <SettingDivider />
-              <SettingRow onPress={() => setIsResetConfirmModalVisible(true)}>
-                <SettingRowLeft>
-                  <SettingIconDanger>
-                    <Trash2 size={20} color="#ef4444" />
-                  </SettingIconDanger>
-                  <SettingLabelDanger>Apagar todos os dados</SettingLabelDanger>
-                </SettingRowLeft>
-                <ChevronRight size={20} color="#d4d4d8" />
-              </SettingRow>
-
-              <LinksContainer>
-                <LinksTitle>Conecte-se</LinksTitle>
-                <LinkRow onPress={openGithub} activeOpacity={0.7}>
-                  <FolderGit2 size={20} color="#71717a" />
-                  <LinkText>GitHub</LinkText>
-                </LinkRow>
-                <LinkRow onPress={openPortfolio} activeOpacity={0.7}>
-                  <Globe size={20} color="#71717a" />
-                  <LinkText>Portfólio Web</LinkText>
-                </LinkRow>
-              </LinksContainer>
-            </SettingsBody>
-
-            <SettingsFooter>
-              <FooterText>
-                © SmartSplit Mobile - Todos os direitos reservados
-              </FooterText>
-              <FooterTextHighlight>
-                Desenvolvido por @TobiasMaugus
-              </FooterTextHighlight>
-            </SettingsFooter>
-          </SettingsSheet>
-        </SettingsOverlay>
-      </Modal>
-
-      {/* ========================================== */}
-      {/* MODAL DE CONFIRMAÇÃO DE RESET */}
-      {/* ========================================== */}
-      <Modal
-        visible={isResetConfirmModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsResetConfirmModalVisible(false)}
-      >
-        <ConfirmOverlay>
-          <ConfirmContent>
-            <ConfirmTitle>Zerar Aplicativo</ConfirmTitle>
-            <ConfirmSubtitle>
-              Tem certeza que deseja apagar todos os perfis e o histórico de
-              compras? Esta ação não poderá ser desfeita.
-            </ConfirmSubtitle>
-            <ActionButtonsContainer>
-              <ModalCancelButton
-                onPress={() => setIsResetConfirmModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <ModalCancelText>Cancelar</ModalCancelText>
-              </ModalCancelButton>
-              <ModalDeleteButton onPress={handleResetData} activeOpacity={0.7}>
-                <ModalDeleteText>Apagar Tudo</ModalDeleteText>
-              </ModalDeleteButton>
-            </ActionButtonsContainer>
-          </ConfirmContent>
-        </ConfirmOverlay>
-      </Modal>
+      />
     </Container>
   );
 }

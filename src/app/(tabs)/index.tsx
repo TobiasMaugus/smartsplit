@@ -2,13 +2,20 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { QrCode, X, Zap } from "lucide-react-native";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
 import LogoSvg2 from "../../assets/Group2.svg";
 import { Avatar } from "../../components/Avatar";
+import { SettingsModal } from "../../components/SettingsModal";
 import { useAppContext } from "../../context/AppContext";
 
 export default function MainScreen() {
@@ -19,6 +26,7 @@ export default function MainScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
   const [isTorchOn, setIsTorchOn] = useState(false);
+  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const isCompactProfiles = profiles.length > 5;
   const profileAvatarSize = isCompactProfiles ? "xs" : "sm";
 
@@ -406,11 +414,12 @@ export default function MainScreen() {
               Automatize a leitura da nota fiscal e divida o valor rapidamente.
             </Subtitle>
           </HeaderTextGroup>
-          <LogoSvg
-            width={34}
-            height={34}
+          <Pressable
+            onPress={() => setIsSettingsModalVisible(true)}
             style={{ position: "absolute", right: 4, top: -15 }}
-          />
+          >
+            <LogoSvg width={34} height={34} />
+          </Pressable>
         </Header>
 
         <CenterArea>
@@ -449,6 +458,10 @@ export default function MainScreen() {
             ))}
           </ProfilesRow>
         </Footer>
+        <SettingsModal
+          visible={isSettingsModalVisible}
+          onRequestClose={() => setIsSettingsModalVisible(false)}
+        />
       </ScrollContent>
     </Container>
   );

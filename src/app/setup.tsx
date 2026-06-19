@@ -182,7 +182,10 @@ export default function SetupScreen() {
                       key={c}
                       onPress={() => upd(i, "color", c)}
                       style={[{ backgroundColor: c }]}
-                      $isSelected={form.color === c}
+                      // 💡 CORREÇÃO: Garante que as duas strings fiquem em maiúsculas antes de comparar
+                      $isSelected={
+                        form.color?.toUpperCase() === c.toUpperCase()
+                      }
                       activeOpacity={0.8}
                     />
                   ))}
@@ -473,9 +476,12 @@ const ColorOption = styled.TouchableOpacity<{ $isSelected: boolean }>`
   ${({ $isSelected }) =>
     $isSelected &&
     `
+    /* 💡 CORREÇÃO: Mudamos de #FFFFFF (Branco) para #18181B (Grafite Escuro) */
     border-width: 3px;
-    border-color: #FFFFFF;
+    border-color: #18181B; 
     transform: scale(1.15);
+    
+    /* Mantemos a sombra para dar profundidade, mas agora ela não é a única responsável pela visualização */
     shadow-color: #000;
     shadow-offset: 0px;
     shadow-opacity: 0.2;

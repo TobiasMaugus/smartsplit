@@ -1,11 +1,12 @@
 import { useRouter } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
 import { Avatar } from "../../components/Avatar";
+import { SettingsModal } from "../../components/SettingsModal";
 import { useAppContext } from "../../context/AppContext";
 import { HistoryEntry } from "../../types";
 
@@ -14,6 +15,7 @@ const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 export default function HistoryScreen() {
   const { historyEntries } = useAppContext();
   const router = useRouter();
+  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
 
   // Pegamos os limites seguros da tela do celular (como a barra de status no topo)
   const insets = useSafeAreaInsets();
@@ -33,11 +35,12 @@ export default function HistoryScreen() {
           >
             <Title>Últimas Compras</Title>
           </View>
-          <LogoSvg
-            width={34}
-            height={34}
+          <Pressable
+            onPress={() => setIsSettingsModalVisible(true)}
             style={{ position: "absolute", right: 4, top: -15 }}
-          />
+          >
+            <LogoSvg width={34} height={34} />
+          </Pressable>
           <Subtitle>Exibe as últimas compras realizadas.</Subtitle>
         </Header>
 
@@ -135,6 +138,10 @@ export default function HistoryScreen() {
 
         <Spacing />
       </ScrollContent>
+      <SettingsModal
+        visible={isSettingsModalVisible}
+        onRequestClose={() => setIsSettingsModalVisible(false)}
+      />
     </Container>
   );
 }

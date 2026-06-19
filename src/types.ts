@@ -50,6 +50,9 @@ export const COLORS = [
   "#1976D2",
   "#F4511E",
   "#FFD166",
+  "#8E44AD",
+  "#10B981",
+  "#34495E",
 ];
 
 export const COLLECTIVE = "__collective__";
