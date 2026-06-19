@@ -7,13 +7,16 @@ import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
 import { Avatar } from "../../components/Avatar";
 import { SettingsModal } from "../../components/SettingsModal";
+import { ThemeColors } from "../../constants/theme";
 import { useAppContext } from "../../context/AppContext";
+import { useThemeContext } from "../../context/ThemeContext";
 import { HistoryEntry } from "../../types";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 export default function HistoryScreen() {
   const { historyEntries } = useAppContext();
+  const { colors } = useThemeContext();
   const router = useRouter();
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
 
@@ -86,8 +89,6 @@ export default function HistoryScreen() {
                       <PriceText>{fmt(e.total)}</PriceText>
 
                       {/* Fluxo de pagamento verticalizado */}
-                      {/* Fluxo de pagamento verticalizado */}
-                      {/* Fluxo de pagamento verticalizado */}
                       <SplitDetailsContainer>
                         <PayerText numberOfLines={1}>
                           {e.payer.name.split(" ")[0]} pagou
@@ -127,7 +128,7 @@ export default function HistoryScreen() {
                       <IndexBadge>
                         <IndexText>#{historyEntries.length - i}</IndexText>
                       </IndexBadge>
-                      <ChevronRight size={20} color="#D4D4D8" />
+                      <ChevronRight size={20} color={colors.textMuted} />
                     </RightSide>
                   </Card>
                 </Pressable>
@@ -150,7 +151,7 @@ export default function HistoryScreen() {
 
 const Container = styled(View)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 const ScrollContent = styled.ScrollView.attrs({
@@ -171,14 +172,14 @@ const Header = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   letter-spacing: -0.5px;
   line-height: 38px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 8px;
   font-weight: 500;
 `;
@@ -189,20 +190,20 @@ const ListContainer = styled.View`
 
 const EmptyText = styled.Text`
   font-size: 15px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-align: center;
   margin-top: 40px;
   font-weight: 500;
 `;
 
 const Card = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 20px;
   padding: 16px;
   flex-direction: row;
   align-items: center;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 
   shadow-color: #000;
   shadow-offset: 0px 4px;
@@ -227,14 +228,14 @@ const TopRow = styled.View`
 const MarketTitle = styled.Text`
   font-size: 15px;
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   flex: 1;
 `;
 
 const PriceText = styled.Text`
   font-size: 16px;
   font-weight: 700;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   margin-bottom: 6px;
 `;
 
@@ -245,13 +246,13 @@ const SplitDetailsContainer = styled.View`
 
 const PayerText = styled.Text`
   font-size: 12px;
-  color: #4b5563;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 600;
 `;
 
 const DebtorText = styled.Text`
   font-size: 12px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 500;
 `;
 
@@ -265,8 +266,8 @@ const DatesContainer = styled.View`
 const DateText = styled.Text`
   font-size: 11px;
   font-weight: 600;
-  color: #a1a1aa;
-  background-color: #f4f6f9;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   padding-vertical: 2px;
   padding-horizontal: 6px;
   border-radius: 6px;
@@ -275,8 +276,8 @@ const DateText = styled.Text`
 const PurchaseDateText = styled.Text`
   font-size: 11px;
   font-weight: 600;
-  color: #71717a;
-  background-color: #eef2f7;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   padding-vertical: 2px;
   padding-horizontal: 6px;
   border-radius: 6px;
@@ -292,7 +293,7 @@ const IndexBadge = styled.View`
   width: 28px;
   height: 28px;
   border-radius: 14px;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -300,7 +301,7 @@ const IndexBadge = styled.View`
 const IndexText = styled.Text`
   font-size: 10px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
 `;
 
 const Spacing = styled.View`

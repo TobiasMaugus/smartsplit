@@ -1,20 +1,23 @@
 import { Tabs } from "expo-router";
 import { History, ShoppingBag, User } from "lucide-react-native";
+import { useThemeContext } from "../../context/ThemeContext";
 import "../../global.css";
 
 export default function TabLayout() {
+  const { colors } = useThemeContext();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#00C853",
-        tabBarInactiveTintColor: "#D1D5DB",
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         // 1. IMPORTANTE: Remova ou comente a altura fixa se os textos sumirem,
         // pois as abas nativas calculam o padding de forma estrita.
         tabBarStyle: {
           borderTopWidth: 1,
-          borderTopColor: "#F3F4F6",
-          backgroundColor: "#FFFFFF",
+          borderTopColor: colors.tabBarBorder,
+          backgroundColor: colors.backgroundElevated,
         },
         // 2. Ajuste o objeto de estilo para o formato que a aba nativa espera
         tabBarLabelStyle: {

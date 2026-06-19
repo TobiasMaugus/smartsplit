@@ -5,7 +5,9 @@ import { Modal, ScrollView, Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../../components/Avatar";
+import { ThemeColors } from "../../constants/theme";
 import { useAppContext } from "../../context/AppContext";
+import { useThemeContext } from "../../context/ThemeContext";
 import {
   COLLECTIVE,
   GroceryItem,
@@ -22,6 +24,7 @@ export default function HistoryDetail() {
   const router = useRouter();
   const { historyEntries, profiles, deleteHistoryEntry, restoreHistoryEntry } =
     useAppContext();
+  const { colors } = useThemeContext();
 
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
@@ -69,7 +72,7 @@ export default function HistoryDetail() {
       <Container>
         <Header>
           <BackButton onPress={() => router.back()} activeOpacity={0.7}>
-            <ChevronLeft size={20} color="#A1A1AA" />
+            <ChevronLeft size={20} color={colors.textMuted} />
             <BackText>Voltar</BackText>
           </BackButton>
         </Header>
@@ -130,13 +133,13 @@ export default function HistoryDetail() {
         (p) => p.id !== payer.id && totals[p.id] > 0,
       );
 
-      // Bloco de cabeçalho idêntico ao SummaryScreen
+      // 💡 CORREÇÃO 1: Esconde o "Chave PIX:" se não houver Pix
       const messageBlock = [
         `💰 Divisão Concluída!`,
         entry.marketName ? `🛒 Local: ${entry.marketName}` : "",
         `Total da compra: ${fmt(entry.total)}`,
         `Pagador: ${payer.name}`,
-        `Chave PIX: ${pixKey}\n`,
+        pixKey ? `Chave PIX: ${pixKey}\n` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -144,9 +147,10 @@ export default function HistoryDetail() {
       // Geração de linhas de débitos com o link do seu site
       const debtLines = validDebtors.map((o: Profile) => {
         const valorIndividual = totals[o.id] ?? 0;
-        let texto = `${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
-
+        
+        // 💡 CORREÇÃO 2: Só coloca os ':' se tiver Pix
         if (pixKey) {
+          let texto = `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
           const emvCode = generatePixBRCode(
             pixKey,
             valorIndividual,
@@ -156,18 +160,21 @@ export default function HistoryDetail() {
           const safePixCode = encodeURIComponent(emvCode);
           const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
           texto += `\n${pixLink}`;
+          return texto;
+        } else {
+          return `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}`;
         }
-        return texto;
       });
 
-      const message = `${messageBlock}\n${debtLines.join("\n\n")}`;
+      // 💡 CORREÇÃO 3: Não dá 2 quebras de linha se não houver Pix
+      const separador = pixKey ? "\n\n" : "\n";
+      const message = `${messageBlock}\n${debtLines.join(separador)}`;
 
       await Share.share({ message });
     } catch (error) {
       console.error("Erro ao compartilhar:", error);
     }
   };
-
   const hasCollective = entry.items?.some(
     (it) => (entry.allocs?.[it.id]?.[COLLECTIVE] ?? 0) > 0,
   );
@@ -187,7 +194,7 @@ export default function HistoryDetail() {
         </View>
 
         <BackButton onPress={() => router.back()} activeOpacity={0.7}>
-          <ChevronLeft size={20} color="#A1A1AA" />
+          <ChevronLeft size={20} color={colors.textMuted} />
           <BackText>Voltar</BackText>
         </BackButton>
       </Header>
@@ -202,7 +209,7 @@ export default function HistoryDetail() {
               </Market>
               {/* Botão de cobrança atualizado: Novo ícone e maior */}
               <ShareBtn onPress={handleShare} activeOpacity={0.7}>
-                <Share2 size={40} color="#10b981" />
+                <Share2 size={40} color={colors.accent} />
               </ShareBtn>
             </MarketRow>
             <Meta>
@@ -387,7 +394,7 @@ export default function HistoryDetail() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 const Header = styled.View`
@@ -397,7 +404,7 @@ const Header = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   letter-spacing: -0.5px;
   line-height: 38px;
   text-align: center;
@@ -411,7 +418,7 @@ const BackButton = styled.TouchableOpacity`
 `;
 
 const BackText = styled.Text`
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-size: 16px;
   font-weight: 600;
 `;
@@ -448,14 +455,14 @@ const MarketRow = styled.View`
 const Market = styled.Text`
   font-size: 16px;
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   flex: 1;
   margin-right: 8px;
 `;
 
 const ShareBtn = styled.TouchableOpacity`
   padding: 10px;
-  background-color: #ecfdf5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accentLight};
   border-radius: 12px;
   align-items: center;
   justify-content: center;
@@ -474,19 +481,19 @@ const Meta = styled.View`
 const Total = styled.Text`
   font-size: 20px;
   font-weight: 900;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   margin-top: 0px; /* Removido o gap superior */
 `;
 
 const MetaText = styled.Text`
   font-size: 12px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 600;
 `;
 
 const Divider = styled.View`
   height: 1px;
-  background-color: #eef2f7;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.divider};
   margin-vertical: 16px;
 `;
 
@@ -498,9 +505,11 @@ const FilterScrollWrapper = styled.View`
 const FilterPill = styled.TouchableOpacity<{ $active: boolean }>`
   padding: 8px 16px;
   border-radius: 999px;
-  background-color: ${({ $active }) => ($active ? "#18181B" : "#FFFFFF")};
+  background-color: ${({ $active, theme }: { $active: boolean; theme: ThemeColors }) =>
+    $active ? theme.text : theme.cardBackground};
   border-width: 1px;
-  border-color: ${({ $active }) => ($active ? "#18181B" : "#E4E4E7")};
+  border-color: ${({ $active, theme }: { $active: boolean; theme: ThemeColors }) =>
+    $active ? theme.text : theme.borderLight};
   flex-direction: row;
   align-items: center;
   gap: 6px;
@@ -509,7 +518,8 @@ const FilterPill = styled.TouchableOpacity<{ $active: boolean }>`
 const FilterPillText = styled.Text<{ $active: boolean }>`
   font-size: 13px;
   font-weight: 600;
-  color: ${({ $active }) => ($active ? "#FFFFFF" : "#71717A")};
+  color: ${({ $active, theme }: { $active: boolean; theme: ThemeColors }) =>
+    $active ? theme.background : theme.textSecondary};
 `;
 
 const Section = styled.View``;
@@ -517,14 +527,14 @@ const Section = styled.View``;
 const SectionTitle = styled.Text`
   font-size: 13px;
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   margin-bottom: 8px;
 `;
 
 const ItemRow = styled.View`
   padding-vertical: 12px;
   border-bottom-width: 1px;
-  border-bottom-color: #eef2f7;
+  border-bottom-color: ${({ theme }: { theme: ThemeColors }) => theme.divider};
 `;
 
 const ItemHeader = styled.View`
@@ -537,7 +547,7 @@ const ItemHeader = styled.View`
 const ItemName = styled.Text`
   font-size: 14px;
   font-weight: 700;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   flex: 1;
   margin-right: 12px;
 `;
@@ -545,7 +555,7 @@ const ItemName = styled.Text`
 const ItemUnitPrice = styled.Text`
   font-size: 13px;
   font-weight: 600;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
 `;
 
 const AllocationsWrapper = styled.View`
@@ -560,12 +570,12 @@ const AllocRow = styled.View`
 
 const AllocText = styled.Text`
   font-size: 12px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 500;
 `;
 
 const SharedBadge = styled.View`
-  background-color: #e0f2fe;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.infoLight};
   padding: 4px 8px;
   border-radius: 999px;
 `;
@@ -573,13 +583,13 @@ const SharedBadge = styled.View`
 const SharedBadgeText = styled.Text`
   font-size: 10px;
   font-weight: 800;
-  color: #0284c7;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.infoText};
   text-transform: uppercase;
 `;
 
 const EmptyText = styled.Text`
   font-size: 14px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   margin-top: 8px;
 `;
 
@@ -595,7 +605,7 @@ const Footer = styled.View`
 
 const PrimaryButton = styled.TouchableOpacity`
   flex: 1;
-  background-color: #10b981;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   padding: 14px;
   border-radius: 12px;
   align-items: center;
@@ -608,9 +618,9 @@ const PrimaryText = styled.Text`
 `;
 
 const DangerButton = styled.TouchableOpacity`
-  background-color: #fff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-width: 1px;
-  border-color: #ff4757;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
   padding: 14px;
   border-radius: 12px;
   align-items: center;
@@ -618,7 +628,7 @@ const DangerButton = styled.TouchableOpacity`
 `;
 
 const DangerText = styled.Text`
-  color: #ff4757;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
   font-weight: 800;
 `;
 
@@ -628,14 +638,14 @@ const ModalOverlay = styled.View`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(9, 9, 11, 0.7);
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
   align-items: center;
   justify-content: center;
   padding: 24px;
 `;
 
 const ModalContent = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   width: 100%;
   max-width: 340px;
   border-radius: 24px;
@@ -651,14 +661,14 @@ const ModalContent = styled.View`
 `;
 
 const ModalTitle = styled.Text`
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 18px;
   font-weight: 700;
   text-align: center;
 `;
 
 const ModalSubtitle = styled.Text`
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 8px;
   font-size: 13px;
   text-align: center;
@@ -675,16 +685,16 @@ const ActionButtonsContainer = styled.View`
 const ModalCancelButton = styled.TouchableOpacity`
   flex: 1;
   height: 48px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 14px;
   align-items: center;
   justify-content: center;
   border-width: 1px;
-  border-color: #e4e4e7;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
 `;
 
 const ModalCancelText = styled.Text`
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-size: 14px;
   font-weight: 600;
 `;
@@ -692,7 +702,7 @@ const ModalCancelText = styled.Text`
 const ModalDeleteButton = styled.TouchableOpacity`
   flex: 1;
   height: 48px;
-  background-color: #ef4444;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
   border-radius: 14px;
   align-items: center;
   justify-content: center;

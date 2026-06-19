@@ -21,10 +21,17 @@ import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
 import { Avatar } from "../../components/Avatar";
 import { SettingsModal } from "../../components/SettingsModal";
+import { ThemeColors } from "../../constants/theme";
 import { useAppContext } from "../../context/AppContext";
+import { useThemeContext } from "../../context/ThemeContext";
+
+const ThemedPencil = styled(Pencil).attrs(({ theme }: { theme: ThemeColors }) => ({
+  color: theme.background, // O Lucide lerá essa propriedade automaticamente
+}))``;
 
 export default function ProfilesScreen() {
   const { profiles, clearAllData } = useAppContext();
+  const { colors } = useThemeContext();
   const insets = useSafeAreaInsets();
 
   // --- ESTADOS ---
@@ -142,7 +149,7 @@ export default function ProfilesScreen() {
             <Animated.View
               style={[{ position: "absolute" }, settingsAnimatedStyle]}
             >
-              <Settings size={28} color="#111827" />
+              <Settings size={28} color={colors.text} />
             </Animated.View>
           </Pressable>
 
@@ -169,12 +176,12 @@ export default function ProfilesScreen() {
                     <ProfileName>{p.name}</ProfileName>
                     {p.pixKey ? (
                       <PixBadge>
-                        <Wallet size={12} color="#059669" />
+                        <Wallet size={12} color={colors.accentText} />
                         <PixText numberOfLines={1}>Com Pix</PixText>
                       </PixBadge>
                     ) : (
                       <NoPixBadge>
-                        <AlertCircle size={12} color="#ea580c" />
+                        <AlertCircle size={12} color={colors.warningText} />
                         <NoPixText>Sem Pix</NoPixText>
                       </NoPixBadge>
                     )}
@@ -182,9 +189,9 @@ export default function ProfilesScreen() {
 
                   <ActionIconWrapper>
                     {isExpanded ? (
-                      <ChevronDown size={20} color="#6b7280" />
+                      <ChevronDown size={20} color={colors.textSecondary} />
                     ) : (
-                      <ChevronRight size={20} color="#9CA3AF" />
+                      <ChevronRight size={20} color={colors.textMuted} />
                     )}
                   </ActionIconWrapper>
                 </ProfileCardTop>
@@ -228,7 +235,7 @@ export default function ProfilesScreen() {
 
         <BottomAction>
           <EditButton onPress={handleEditProfiles} activeOpacity={0.8}>
-            <Pencil size={18} color="#FFFFFF" />
+            <ThemedPencil size={18} />
             <EditButtonText>Editar Perfis</EditButtonText>
           </EditButton>
         </BottomAction>
@@ -247,7 +254,7 @@ export default function ProfilesScreen() {
 
 const Container = styled(View)`
   flex: 1;
-  background-color: #f8fafc;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 const ScrollContainer = styled.ScrollView.attrs({
@@ -268,13 +275,13 @@ const Header = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #111827;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   letter-spacing: -0.5px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 16px;
-  color: #6b7280;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 6px;
   font-weight: 500;
 `;
@@ -285,11 +292,11 @@ const ProfilesList = styled.View`
 
 // O card principal agora é interativo e em coluna
 const ProfileCard = styled.TouchableOpacity`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   border-width: 1px;
-  border-color: #f9fafb;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -322,7 +329,7 @@ const ProfileInfo = styled.View`
 
 const ProfileName = styled.Text`
   font-weight: 800;
-  color: #111827;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 17px;
   margin-bottom: 4px;
 `;
@@ -330,45 +337,45 @@ const ProfileName = styled.Text`
 const PixBadge = styled.View`
   flex-direction: row;
   align-items: center;
-  background-color: #ecfdf5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accentLight};
   align-self: flex-start;
   padding: 4px 10px;
   border-radius: 6px;
   margin-top: 2px;
   border-width: 1px;
-  border-color: #d1fae5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.accentBorder};
 `;
 
 const PixText = styled.Text`
   font-size: 12px;
   font-weight: bold;
-  color: #047857;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accentText};
   margin-left: 6px;
 `;
 
 const NoPixBadge = styled.View`
   flex-direction: row;
   align-items: center;
-  background-color: #fff7ed;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.warningLight};
   align-self: flex-start;
   padding: 4px 10px;
   border-radius: 6px;
   margin-top: 2px;
   border-width: 1px;
-  border-color: #ffedd5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.warningBorder};
 `;
 
 const NoPixText = styled.Text`
   font-size: 12px;
   font-weight: 600;
-  color: #c2410c;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.warningText};
   margin-left: 6px;
 `;
 
 const ActionIconWrapper = styled.View`
   width: 40px;
   height: 40px;
-  background-color: #f9fafb;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 9999px;
   align-items: center;
   justify-content: center;
@@ -382,17 +389,17 @@ const ProfileExpandedContent = styled.View`
 
 const ExpandedDivider = styled.View`
   height: 1px;
-  background-color: #f3f4f6;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.divider};
   margin-bottom: 16px;
 `;
 
 const ExpandedDetails = styled.View`
   gap: 12px;
-  background-color: #f8fafc;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   padding: 16px;
   border-radius: 12px;
   border-width: 1px;
-  border-color: #f1f5f9;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
 
 const DetailGroup = styled.View`
@@ -401,7 +408,7 @@ const DetailGroup = styled.View`
 
 const DetailLabel = styled.Text`
   font-size: 11px;
-  color: #94a3b8;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -409,13 +416,13 @@ const DetailLabel = styled.Text`
 
 const DetailValue = styled.Text`
   font-size: 15px;
-  color: #334155;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 600;
 `;
 
 const EmptyDetailsText = styled.Text`
   font-size: 13px;
-  color: #94a3b8;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 500;
   font-style: italic;
   margin-top: 4px;
@@ -429,7 +436,7 @@ const BottomAction = styled.View`
 const EditButton = styled.TouchableOpacity`
   width: 100%;
   padding-vertical: 16px;
-  background-color: #111827;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   border-radius: 16px;
   flex-direction: row;
   align-items: center;
@@ -444,214 +451,7 @@ const EditButton = styled.TouchableOpacity`
 
 const EditButtonText = styled.Text`
   font-weight: bold;
-  color: #ffffff;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.background};
   font-size: 16px;
   letter-spacing: 0.5px;
-`;
-
-// ==========================================
-// STYLED COMPONENTS - MODAIS (MANTIDOS ORIGINAIS)
-// ==========================================
-
-const SettingsOverlay = styled.View`
-  flex: 1;
-  background-color: rgba(9, 9, 11, 0.6);
-  justify-content: flex-end;
-`;
-
-const SettingsSheet = styled.View`
-  background-color: #ffffff;
-  border-top-left-radius: 32px;
-  border-top-right-radius: 32px;
-  padding: 24px;
-  padding-top: 32px;
-  shadow-color: #000;
-  shadow-offset: 0px -4px;
-  shadow-opacity: 0.1;
-  shadow-radius: 12px;
-  elevation: 10;
-`;
-
-const SettingsHeader = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-`;
-
-const CloseButton = styled.TouchableOpacity`
-  width: 32px;
-  height: 32px;
-  align-items: flex-end;
-  justify-content: center;
-`;
-
-const SettingsBody = styled.View`
-  gap: 8px;
-`;
-
-const SettingRow = styled.TouchableOpacity.attrs({ activeOpacity: 0.7 })`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding-vertical: 16px;
-`;
-
-const SettingRowLeft = styled.View`
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-`;
-
-const SettingIconWrapper = styled.View`
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background-color: #f4f4f5;
-  align-items: center;
-  justify-content: center;
-`;
-
-const SettingLabel = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #18181b;
-`;
-
-const SettingIconDanger = styled(SettingIconWrapper)`
-  background-color: #fef2f2;
-`;
-
-const SettingLabelDanger = styled(SettingLabel)`
-  color: #ef4444;
-`;
-
-const SettingDivider = styled.View`
-  height: 1px;
-  background-color: #f4f4f5;
-  margin-vertical: 4px;
-`;
-
-const LinksContainer = styled.View`
-  margin-top: 24px;
-  background-color: #f8fafc;
-  border-radius: 20px;
-  padding: 20px;
-  gap: 16px;
-`;
-
-const LinksTitle = styled.Text`
-  font-size: 13px;
-  font-weight: 800;
-  color: #a1a1aa;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-`;
-
-const LinkRow = styled.TouchableOpacity`
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-`;
-
-const LinkText = styled.Text`
-  font-size: 15px;
-  font-weight: 600;
-  color: #52525b;
-`;
-
-const SettingsFooter = styled.View`
-  align-items: center;
-  margin-top: 40px;
-  gap: 4px;
-`;
-
-const FooterText = styled.Text`
-  font-size: 12px;
-  color: #a1a1aa;
-  font-weight: 500;
-`;
-
-const FooterTextHighlight = styled.Text`
-  font-size: 12px;
-  color: #18181b;
-  font-weight: 700;
-`;
-
-const ConfirmOverlay = styled.View`
-  flex: 1;
-  background-color: rgba(9, 9, 11, 0.7);
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-`;
-
-const ConfirmContent = styled.View`
-  background-color: #ffffff;
-  width: 100%;
-  max-width: 340px;
-  border-radius: 24px;
-  padding: 32px;
-  align-items: center;
-  justify-content: center;
-  shadow-color: #000;
-  shadow-offset: 0px 8px;
-  shadow-opacity: 0.15;
-  shadow-radius: 16px;
-  elevation: 8;
-`;
-
-const ConfirmTitle = styled.Text`
-  color: #18181b;
-  font-size: 18px;
-  font-weight: 700;
-  text-align: center;
-`;
-
-const ConfirmSubtitle = styled.Text`
-  color: #71717a;
-  margin-top: 8px;
-  font-size: 13px;
-  text-align: center;
-  line-height: 18px;
-  margin-bottom: 24px;
-`;
-
-const ActionButtonsContainer = styled.View`
-  flex-direction: row;
-  width: 100%;
-  gap: 12px;
-`;
-
-const ModalCancelButton = styled.TouchableOpacity`
-  flex: 1;
-  height: 48px;
-  background-color: #f4f4f5;
-  border-radius: 14px;
-  align-items: center;
-  justify-content: center;
-  border-width: 1px;
-  border-color: #e4e4e7;
-`;
-
-const ModalCancelText = styled.Text`
-  color: #71717a;
-  font-size: 14px;
-  font-weight: 600;
-`;
-
-const ModalDeleteButton = styled.TouchableOpacity`
-  flex: 1;
-  height: 48px;
-  background-color: #ef4444;
-  border-radius: 14px;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ModalDeleteText = styled.Text`
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
 `;

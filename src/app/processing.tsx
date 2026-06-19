@@ -14,7 +14,9 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { getInitials } from "../components/Avatar";
+import { ThemeColors } from "../constants/theme";
 import { useAppContext } from "../context/AppContext";
+import { useThemeContext } from "../context/ThemeContext";
 import { Allocations, COLLECTIVE, getCollectiveLabel } from "../types";
 
 interface UndoEntry {
@@ -33,6 +35,7 @@ export default function ProcessingScreen() {
     setItems,
     setAllocs: setGlobalAllocs,
   } = useAppContext();
+  const { colors, isDark } = useThemeContext();
 
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
@@ -228,7 +231,7 @@ export default function ProcessingScreen() {
         >
           <AvatarCircle
             $density={avatarDensity}
-            style={{ backgroundColor: "#27272A" }}
+            style={{ backgroundColor: isDark ? "#3F3F46" : "#27272A" }}
             $isSelected={false}
           >
             <Users
@@ -265,12 +268,12 @@ export default function ProcessingScreen() {
       <TopPanel>
         <HeaderActions>
           <BackButton onPress={() => router.back()} activeOpacity={0.7}>
-            <ChevronLeft size={20} color="#A1A1AA" />
-            <BackText>Voltar</BackText>
+            <ChevronLeft size={20} color={colors.textMuted} />
+            <BackBtnText>Voltar</BackBtnText>
           </BackButton>
 
           <CancelButton onPress={onCancelPurchase} activeOpacity={0.6}>
-            <X size={18} color="#A1A1AA" />
+            <X size={18} color={colors.textMuted} />
           </CancelButton>
         </HeaderActions>
 
@@ -299,7 +302,7 @@ export default function ProcessingScreen() {
         {allDone ? (
           <DoneContainer>
             <DoneIconWrapper>
-              <CheckCircle2 size={48} color="#10B981" />
+              <CheckCircle2 size={48} color={colors.accent} />
             </DoneIconWrapper>
             <DoneTitle>Todos atribuídos!</DoneTitle>
             <DoneSubtitle>Clique em Finalizar para ver o resumo.</DoneSubtitle>
@@ -335,7 +338,7 @@ export default function ProcessingScreen() {
                   >
                     <Minus
                       size={avatarDensity === "spacious" ? 24 : 20}
-                      color="#3F3F46"
+                      color={colors.textSecondary}
                     />
                   </QtyButton>
                   <QtyValue $density={avatarDensity}>
@@ -348,7 +351,7 @@ export default function ProcessingScreen() {
                   >
                     <Plus
                       size={avatarDensity === "spacious" ? 24 : 20}
-                      color="#3F3F46"
+                      color={colors.textSecondary}
                     />
                   </QtyButton>
                 </QtyContainer>
@@ -431,7 +434,7 @@ export default function ProcessingScreen() {
             activeOpacity={0.7}
             style={{ flex: 1 }}
           >
-            <Undo2 size={18} color={undoStack.length ? "#3F3F46" : "#A1A1AA"} />
+            <Undo2 size={18} color={undoStack.length ? colors.textSecondary : colors.textMuted} />
             <ActionButtonText
               $variant={undoStack.length ? "default" : "disabled"}
             >
@@ -445,7 +448,7 @@ export default function ProcessingScreen() {
             activeOpacity={0.7}
             style={{ flex: 1 }}
           >
-            <RotateCcw size={18} color="#3F3F46" />
+            <RotateCcw size={18} color={colors.textSecondary} />
             <ActionButtonText $variant="default">Reiniciar</ActionButtonText>
           </ActionButton>
         </ButtonRow>
@@ -458,14 +461,14 @@ export default function ProcessingScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 const TopPanel = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   padding: 16px 24px 16px 24px;
   border-bottom-width: 1px;
-  border-bottom-color: #e4e4e7;
+  border-bottom-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
   z-index: 10;
 `;
 
@@ -482,8 +485,8 @@ const BackButton = styled.TouchableOpacity`
   gap: 4px;
 `;
 
-const BackText = styled.Text`
-  color: #a1a1aa;
+const BackBtnText = styled.Text`
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-size: 16px;
   font-weight: 600;
 `;
@@ -492,7 +495,7 @@ const CancelButton = styled.TouchableOpacity`
   width: 28px;
   height: 28px;
   border-radius: 14px;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -507,26 +510,26 @@ const HeaderInfo = styled.View`
 const TotalText = styled.Text`
   font-size: 22px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const ProgressLabel = styled.Text`
   font-size: 14px;
   font-weight: 700;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-bottom: 2px;
 `;
 
 const ProgressTrack = styled.View`
   height: 7px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 3px;
   overflow: hidden;
 `;
 
 const ProgressFill = styled.View`
   height: 100%;
-  background-color: #10b981;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   border-radius: 3px;
 `;
 
@@ -552,7 +555,7 @@ const DoneIconWrapper = styled.View`
   width: 80px;
   height: 80px;
   border-radius: 40px;
-  background-color: #ecfdf5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accentLight};
   align-items: center;
   justify-content: center;
 `;
@@ -560,17 +563,17 @@ const DoneIconWrapper = styled.View`
 const DoneTitle = styled.Text`
   font-size: 22px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const DoneSubtitle = styled.Text`
   font-size: 14px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 500;
 `;
 
 const Card = styled.View<{ $density?: "spacious" | "normal" | "compact" }>`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 20px;
   padding: ${({ $density }) =>
     $density === "spacious"
@@ -579,7 +582,7 @@ const Card = styled.View<{ $density?: "spacious" | "normal" | "compact" }>`
         ? "16px 18px"
         : "20px 24px"};
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -590,7 +593,7 @@ const Card = styled.View<{ $density?: "spacious" | "normal" | "compact" }>`
 const CardLabel = styled.Text`
   font-size: 12px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -604,7 +607,7 @@ const ItemTitle = styled.Text<{ $density?: "spacious" | "normal" | "compact" }>`
         ? "20px"
         : "22px"};
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   margin-bottom: 12px;
   line-height: ${({ $density }) =>
     $density === "spacious"
@@ -634,7 +637,7 @@ const ItemPrice = styled.Text<{ $density?: "spacious" | "normal" | "compact" }>`
       : $density === "compact"
         ? "14px"
         : "16px"};
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 700;
 `;
 
@@ -648,7 +651,7 @@ const ItemRemaining = styled.Text<{
         ? "13px"
         : "14px"};
   font-weight: 800;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
 `;
 
 const QtyContainer = styled.View`
@@ -674,7 +677,7 @@ const QtyButton = styled.TouchableOpacity<{
         ? "44px"
         : "48px"};
   border-radius: 16px;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -687,7 +690,7 @@ const QtyValue = styled.Text<{ $density?: "spacious" | "normal" | "compact" }>`
         ? "32px"
         : "38px"};
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   width: 70px;
   text-align: center;
 `;
@@ -696,11 +699,11 @@ const ToggleCard = styled.View`
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 20px;
   padding: 16px 20px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.04;
@@ -713,12 +716,12 @@ const ToggleTextGroup = styled.View``;
 const ToggleTitle = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const ToggleSubtitle = styled.Text`
   font-size: 12px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   margin-top: 2px;
   font-weight: 500;
 `;
@@ -727,7 +730,8 @@ const SwitchTrack = styled.TouchableOpacity<{ $isActive: boolean }>`
   width: 46px;
   height: 26px;
   border-radius: 13px;
-  background-color: ${({ $isActive }) => ($isActive ? "#10B981" : "#E4E4E7")};
+  background-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? theme.accent : theme.borderLight};
   justify-content: center;
   padding-horizontal: 2px;
 `;
@@ -791,11 +795,11 @@ const AvatarCircle = styled.View<{
   align-items: center;
   justify-content: center;
 
-  ${({ $isSelected }) =>
+  ${({ $isSelected, theme }) =>
     $isSelected &&
     `
     border-width: 2.5px;
-    border-color: #18181b;
+    border-color: ${(theme as ThemeColors).text};
     transform: scale(1.05);
   `}
 `;
@@ -823,7 +827,7 @@ const AvatarLabel = styled.Text<{
         ? "10px"
         : "11px"};
   font-weight: 700;
-  color: #52525b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   text-align: center;
   max-width: 100%;
 `;
@@ -832,7 +836,7 @@ const ConfirmButton = styled.TouchableOpacity`
   margin-top: 16px;
   width: 100%;
   padding-vertical: 14px;
-  background-color: #10b981;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   border-radius: 14px;
   flex-direction: row;
   align-items: center;
@@ -849,7 +853,7 @@ const ConfirmText = styled.Text`
 const HelperText = styled.Text`
   margin-top: 12px;
   font-size: 12px;
-  color: #d4d4d8;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-align: center;
   font-weight: 600;
 `;
@@ -860,9 +864,9 @@ const Spacing = styled.View`
 
 const BottomBar = styled.View`
   padding: 12px 24px 24px 24px;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   border-top-width: 1px;
-  border-top-color: #f4f4f5;
+  border-top-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
 
 const ButtonRow = styled.View`
@@ -879,10 +883,10 @@ const ActionButton = styled.TouchableOpacity<{
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: ${({ $variant }) => {
-    if ($variant === "primary") return "#10B981";
-    if ($variant === "disabled") return "#FAFAFA";
-    return "#F4F4F5";
+  background-color: ${({ $variant, theme }: { $variant: string; theme: ThemeColors }) => {
+    if ($variant === "primary") return theme.accent;
+    if ($variant === "disabled") return theme.backgroundElement;
+    return theme.backgroundElement;
   }};
 `;
 
@@ -891,9 +895,9 @@ const ActionButtonText = styled.Text<{
 }>`
   font-weight: 800;
   font-size: 13px;
-  color: ${({ $variant }) => {
+  color: ${({ $variant, theme }: { $variant: string; theme: ThemeColors }) => {
     if ($variant === "primary") return "#FFFFFF";
-    if ($variant === "disabled") return "#A1A1AA";
-    return "#3F3F46";
+    if ($variant === "disabled") return theme.textMuted;
+    return theme.textSecondary;
   }};
 `;

@@ -13,7 +13,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
 import { PixModal } from "../components/PixModal";
+import { ThemeColors } from "../constants/theme";
 import { useAppContext } from "../context/AppContext";
+import { useThemeContext } from "../context/ThemeContext";
 import {
   Allocations,
   COLLECTIVE,
@@ -78,6 +80,7 @@ export default function SummaryScreen() {
     editingEntry,
     setEditingEntry,
   } = useAppContext();
+  const { colors } = useThemeContext();
 
   const [payerId, setPayerId] = useState<string | null>(null);
   const [showPix, setShowPix] = useState(false);
@@ -198,9 +201,10 @@ export default function SummaryScreen() {
 
     const debtLines = validDebtors.map((o: Profile) => {
       const valorIndividual = shares[o.id] ?? 0;
-      let texto = `${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
-
+      
+      // Se TEM chave Pix, coloca os ":" e o link
       if (pixKey) {
+        let texto = `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
         const emvCode = generatePixBRCode(
           pixKey,
           valorIndividual,
@@ -210,11 +214,17 @@ export default function SummaryScreen() {
         const safePixCode = encodeURIComponent(emvCode);
         const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
         texto += `\n${pixLink}`;
+        return texto;
+      } 
+      // Se NÃO TEM chave Pix, remove os ":"
+      else {
+        return `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}`;
       }
-      return texto;
     });
 
-    const message = `${messageBlock}\n${debtLines.join("\n\n")}`;
+    // Se tiver Pix, separa com 2 linhas para os links não embolarem. Se não tiver, 1 linha só.
+    const separador = pixKey ? "\n\n" : "\n";
+    const message = `${messageBlock}\n${debtLines.join(separador)}`;
 
     try {
       await Share.share({ message });
@@ -247,7 +257,7 @@ export default function SummaryScreen() {
 
       <Header>
         <BackButton onPress={() => router.back()} activeOpacity={0.7}>
-          <ChevronLeft size={20} color="#A1A1AA" />
+          <ChevronLeft size={20} color={colors.textMuted} />
           <BackText>Voltar</BackText>
         </BackButton>
         <Title>Quem Pagou?</Title>
@@ -296,7 +306,7 @@ export default function SummaryScreen() {
         {payerId && (
           <View style={{ gap: 16 }}>
             <Card style={{ marginBottom: 0 }}>
-              <CardLabel style={{ marginBottom: 16 }}>Rateio</CardLabel>
+              <CardLabel style={{ marginBottom: 16 }}>Divisão</CardLabel>
               <BreakdownList $isCompact={isCompact}>
                 {profiles.map((p) => (
                   <BreakdownItem key={p.id} $isCompact={isCompact}>
@@ -328,7 +338,7 @@ export default function SummaryScreen() {
                 ))}
               </BreakdownList>
 
-              <Divider />
+              <SDivider />
 
               <OwningBox $isCompact={isCompact}>
                 {others.length > 0 ? (
@@ -379,7 +389,7 @@ export default function SummaryScreen() {
                           >
                             <QrCode
                               size={16}
-                              color={payer?.pixKey ? "#10B981" : "#A1A1AA"}
+                              color={payer?.pixKey ? colors.accent : colors.textMuted}
                             />
                           </MiniQrButton>
                         )}
@@ -393,7 +403,7 @@ export default function SummaryScreen() {
             </Card>
 
             <InlineSaveButton onPress={handleSaveAndExit} activeOpacity={0.85}>
-              <Save size={18} color="#10B981" />
+              <Save size={18} color={colors.accent} />
               <InlineSaveText>Salvar e Voltar</InlineSaveText>
             </InlineSaveButton>
           </View>
@@ -402,7 +412,7 @@ export default function SummaryScreen() {
         {!payerId && (
           <EmptyPayerBox>
             <EmptyPayerIcon>
-              <User size={20} color="#A1A1AA" />
+              <User size={20} color={colors.textMuted} />
             </EmptyPayerIcon>
             <EmptyPayerText>
               Selecione quem pagou para ver a divisão de valores
@@ -421,9 +431,12 @@ export default function SummaryScreen() {
             $variant={payerId ? "dark" : "disabled"}
             activeOpacity={0.8}
           >
-            <Share2 size={18} color={payerId ? "#FFFFFF" : "#A1A1AA"} />
+            <Share2 
+              size={18} 
+              color={payerId ? colors.darkCardText : colors.textMuted} 
+            />
             <ActionText $variant={payerId ? "dark" : "disabled"}>
-              Partilhar
+              Compartilhar
             </ActionText>
           </ActionButton>
 
@@ -441,7 +454,7 @@ export default function SummaryScreen() {
               color={
                 payerId && validDebtors.length > 0 && payer?.pixKey
                   ? "#FFFFFF"
-                  : "#A1A1AA"
+                  : colors.textMuted
               }
             />
             <ActionText
@@ -484,7 +497,7 @@ export default function SummaryScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 // 💡 Container Base com estilo Branco limpo e posicionado no Topo superior
@@ -493,12 +506,12 @@ const ToastContainerBase = styled.View`
   top: 60px;
   left: 32px;
   right: 32px;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   padding-vertical: 14px;
   padding-horizontal: 20px;
   border-radius: 20px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   align-items: center;
   justify-content: center;
 
@@ -515,7 +528,7 @@ const AnimatedToastContainer =
   Animated.createAnimatedComponent(ToastContainerBase);
 
 const ToastText = styled.Text`
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 14px;
   font-weight: 700;
   text-align: center;
@@ -536,20 +549,20 @@ const BackButton = styled.TouchableOpacity`
 const BackText = styled.Text`
   font-size: 15px;
   font-weight: 600;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
 `;
 
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   letter-spacing: -0.5px;
   line-height: 38px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 4px;
   font-weight: 500;
 `;
@@ -564,7 +577,7 @@ const ScrollContent = styled.ScrollView.attrs({
 `;
 
 const TotalCard = styled.View`
-  background-color: #18181b;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.darkCard};
   border-radius: 24px;
   padding: 24px;
   flex-direction: row;
@@ -581,7 +594,7 @@ const TotalCard = styled.View`
 
 const TotalLabel = styled.Text`
   font-size: 11px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -590,7 +603,7 @@ const TotalLabel = styled.Text`
 const TotalValue = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #ffffff;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.darkCardText};
   margin-top: 4px;
 `;
 
@@ -604,12 +617,12 @@ const TotalIconBox = styled.View`
 `;
 
 const Card = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   margin-bottom: 16px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 
   shadow-color: #000;
   shadow-offset: 0px 4px;
@@ -621,7 +634,7 @@ const Card = styled.View`
 const CardLabel = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -648,29 +661,29 @@ const PayerButton = styled.TouchableOpacity<{
   min-width: ${({ $isCompact }) => ($isCompact ? "90px" : "120px")};
   max-width: ${({ $isCompact }) => ($isCompact ? "110px" : "160px")};
 
-  ${({ $isActive }) =>
+  ${({ $isActive, theme }) =>
     $isActive
       ? `
-    border-color: #10B981;
-    background-color: #ECFDF5;
+    border-color: ${(theme as ThemeColors).accent};
+    background-color: ${(theme as ThemeColors).accentLight};
   `
       : `
-    border-color: #F4F4F5;
-    background-color: #FAFAFA;
+    border-color: ${(theme as ThemeColors).border};
+    background-color: ${(theme as ThemeColors).backgroundElement};
   `}
 `;
 
 const PayerName = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "13px" : "15px")};
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   text-align: center;
 `;
 
 const PayerStatus = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "10px" : "12px")};
   font-weight: 800;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
 `;
 
 const BreakdownList = styled.View<{ $isCompact?: boolean }>`
@@ -696,18 +709,18 @@ const BreakdownHeader = styled.View`
 const BreakdownName = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const BreakdownValue = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const ProgressBarBox = styled.View`
   height: 8px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 4px;
   overflow: hidden;
 `;
@@ -717,14 +730,14 @@ const ProgressBarFill = styled.View`
   border-radius: 4px;
 `;
 
-const Divider = styled.View`
+const SDivider = styled.View`
   height: 1px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   margin-vertical: 16px;
 `;
 
 const OwningBox = styled.View<{ $isCompact?: boolean }>`
-  background-color: #ecfdf5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accentLight};
   border-radius: 16px;
   padding: ${({ $isCompact }) => ($isCompact ? "12px" : "16px")};
   gap: ${({ $isCompact }) => ($isCompact ? "8px" : "12px")};
@@ -745,61 +758,63 @@ const OwningUser = styled.View`
 const OwningText = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 600;
-  color: #3f3f46;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
 `;
 
 const OwningValue = styled.Text<{ $isCompact?: boolean }>`
   font-size: ${({ $isCompact }) => ($isCompact ? "14px" : "16px")};
   font-weight: 900;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
 `;
 
 const MiniQrButton = styled.TouchableOpacity<{ $disabled?: boolean }>`
-  background-color: ${({ $disabled }) => ($disabled ? "#FAFAFA" : "#ffffff")};
+  background-color: ${({ $disabled, theme }: { $disabled?: boolean; theme: ThemeColors }) =>
+    $disabled ? theme.backgroundElement : theme.backgroundElevated};
   padding: 6px;
   border-radius: 10px;
   border-width: 1px;
-  border-color: ${({ $disabled }) => ($disabled ? "#E4E4E7" : "#d1fae5")};
+  border-color: ${({ $disabled, theme }: { $disabled?: boolean; theme: ThemeColors }) =>
+    $disabled ? theme.borderLight : theme.accentBorder};
 `;
 
 const EmptyOwning = styled.Text`
   font-size: 14px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-align: center;
   font-weight: 500;
 `;
 
 const EmptyPayerBox = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   flex-direction: row;
   align-items: center;
   gap: 16px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
 
 const EmptyPayerIcon = styled.View`
   width: 44px;
   height: 44px;
   border-radius: 22px;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
 
 const EmptyPayerText = styled.Text`
   font-size: 14px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 500;
   flex: 1;
 `;
 
 const InlineSaveButton = styled.TouchableOpacity`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-width: 1px;
-  border-color: #e4e4e7;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
   border-radius: 20px;
   padding-vertical: 16px;
   flex-direction: row;
@@ -816,7 +831,7 @@ const InlineSaveButton = styled.TouchableOpacity`
 `;
 
 const InlineSaveText = styled.Text`
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 15px;
   font-weight: 800;
 `;
@@ -827,9 +842,9 @@ const Spacing = styled.View`
 
 const BottomBar = styled.View`
   padding: 16px 24px 32px 24px;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   border-top-width: 1px;
-  border-top-color: #f4f4f5;
+  border-top-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
 
 const ButtonRow = styled.View`
@@ -848,33 +863,52 @@ const ActionButton = styled.TouchableOpacity<{
   justify-content: center;
   gap: 8px;
 
-  ${({ $variant }) => {
+  ${({ $variant, theme }) => {
+    const t = theme as any; 
+
     if ($variant === "primary")
       return `
-      background-color: #10B981;
-      shadow-color: #10B981;
+      background-color: ${t.accent};
+      shadow-color: ${t.accent};
       shadow-offset: 0px 6px;
       shadow-opacity: 0.25;
       shadow-radius: 12px;
       elevation: 4;
     `;
+    
     if ($variant === "dark")
       return `
-      background-color: #18181B;
+      /* 💡 Usa a variável darkCard que já funciona para os dois temas */
+      background-color: ${t.darkCard};
       shadow-color: #000;
       shadow-offset: 0px 6px;
       shadow-opacity: 0.2;
       shadow-radius: 12px;
       elevation: 4;
     `;
+    
     return `
-      background-color: #F4F4F5;
+      background-color: ${t.border};
     `;
   }}
 `;
 
-const ActionText = styled.Text<{ $variant: "primary" | "dark" | "disabled" }>`
+const ActionText = styled.Text<{
+  $variant: "primary" | "dark" | "disabled";
+}>`
+  font-size: 16px;
   font-weight: 800;
-  font-size: 15px;
-  color: ${({ $variant }) => ($variant === "disabled" ? "#A1A1AA" : "#FFFFFF")};
+
+  color: ${({ $variant, theme }) => {
+    const t = theme as any;
+    
+    if ($variant === "primary") return "#FFFFFF";
+    
+    if ($variant === "dark") {
+      /* 💡 Acompanha a cor de contraste do darkCard */
+      return t.darkCardText;
+    }
+    
+    return t.textMuted;
+  }};
 `;

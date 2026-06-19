@@ -13,15 +13,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import styled from "styled-components/native";
 import LogoSvg from "../../assets/Group1.svg";
-import LogoSvg2 from "../../assets/Group2.svg";
+import LogoSvg2Light from "../../assets/Group2.svg";
+import LogoSvg2Dark from "../../assets/Group2d.svg";
 import { Avatar } from "../../components/Avatar";
 import { SettingsModal } from "../../components/SettingsModal";
+import { ThemeColors } from "../../constants/theme";
 import { useAppContext } from "../../context/AppContext";
+import { useThemeContext } from "../../context/ThemeContext";
 
 export default function MainScreen() {
   const { profiles, setItems, setScrapedMarket, setScrapedDate } =
     useAppContext();
   const { setScrapedTime } = useAppContext();
+  const { isDark, colors } = useThemeContext();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
@@ -29,6 +33,8 @@ export default function MainScreen() {
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const isCompactProfiles = profiles.length > 5;
   const profileAvatarSize = isCompactProfiles ? "xs" : "sm";
+
+  const LogoSvg2 = isDark ? LogoSvg2Dark : LogoSvg2Light;
 
   const onScan = async () => {
     if (!permission?.granted) {
@@ -93,7 +99,7 @@ export default function MainScreen() {
     }
   };
 
-  const INJECTED_JS = `
+ const INJECTED_JS = `
     setTimeout(() => {
       // 🔥 Função auxiliar para mandar LOGs para o React Native
       const sendLog = (msg) => {
@@ -310,7 +316,7 @@ export default function MainScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(9, 9, 11, 0.7)",
+            backgroundColor: colors.modalOverlay,
             alignItems: "center",
             justifyContent: "center",
             padding: 24,
@@ -318,7 +324,7 @@ export default function MainScreen() {
         >
           <View
             style={{
-              backgroundColor: "#FFFFFF",
+              backgroundColor: colors.backgroundElevated,
               width: "100%",
               maxWidth: 340,
               borderRadius: 24,
@@ -342,13 +348,13 @@ export default function MainScreen() {
 
             <ActivityIndicator
               size="large"
-              color="#6C63FF"
+              color={colors.loadingAnimation}
               style={{ transform: [{ scale: 1.2 }] }}
             />
 
             <ScanText
               style={{
-                color: "#18181B",
+                color: colors.text,
                 marginTop: 20,
                 fontSize: 16,
                 fontWeight: "600",
@@ -360,7 +366,7 @@ export default function MainScreen() {
 
             <ScanText
               style={{
-                color: "#71717A",
+                color: colors.textSecondary,
                 marginTop: 6,
                 fontSize: 13,
                 textAlign: "center",
@@ -376,17 +382,17 @@ export default function MainScreen() {
                 marginTop: 28,
                 width: "100%",
                 height: 48,
-                backgroundColor: "#F4F4F5",
+                backgroundColor: colors.backgroundElement,
                 borderRadius: 14,
                 alignItems: "center",
                 justifyContent: "center",
                 borderWidth: 1,
-                borderColor: "#E4E4E7",
+                borderColor: colors.borderLight,
               }}
               activeOpacity={0.7}
             >
               <ScanText
-                style={{ color: "#EF4444", fontSize: 14, fontWeight: "600" }}
+                style={{ color: colors.danger, fontSize: 14, fontWeight: "600" }}
               >
                 Cancelar Leitura
               </ScanText>
@@ -475,17 +481,21 @@ type ProfileNameProps = {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
-const ScrollContent = styled.ScrollView.attrs({
+const ScrollContent = styled.ScrollView.attrs(({
+  theme,
+}: {
+  theme: ThemeColors;
+}) => ({
   contentContainerStyle: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 32,
-    paddingBottom: 16, // Reduzido levemente para um encaixe mais elegante perto da tab
+    paddingBottom: 16,
   },
-})`
+}))`
   flex: 1;
 `;
 
@@ -504,14 +514,14 @@ const HeaderTextGroup = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   letter-spacing: -0.5px;
   line-height: 38px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 8px;
   font-weight: 500;
   line-height: 22px;
@@ -524,12 +534,12 @@ const CenterArea = styled.View`
 `;
 
 const MainCard = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 24px;
   padding: 32px 24px;
   align-items: center;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 
   shadow-color: #000;
   shadow-offset: 0px 8px;
@@ -542,12 +552,12 @@ const IconWrapper = styled.View`
   width: 88px;
   height: 88px;
   border-radius: 28px;
-  background-color: #10b981;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   align-items: center;
   justify-content: center;
   margin-bottom: 24px;
 
-  shadow-color: #10b981;
+  shadow-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   shadow-offset: 0px 8px;
   shadow-opacity: 0.3;
   shadow-radius: 12px;
@@ -563,13 +573,13 @@ const CardTextGroup = styled.View`
 const CardTitle = styled.Text`
   font-size: 20px;
   font-weight: 800;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   margin-bottom: 8px;
 `;
 
 const CardDescription = styled.Text`
   font-size: 14px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-align: center;
   line-height: 20px;
   font-weight: 500;
@@ -578,12 +588,12 @@ const CardDescription = styled.Text`
 const PrimaryButton = styled.TouchableOpacity`
   width: 100%;
   padding-vertical: 18px;
-  background-color: #10b981;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   border-radius: 16px;
   align-items: center;
   justify-content: center;
 
-  shadow-color: #10b981;
+  shadow-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   shadow-offset: 0px 6px;
   shadow-opacity: 0.25;
   shadow-radius: 12px;
@@ -605,7 +615,7 @@ const Footer = styled.View`
 const FooterLabel = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #d4d4d8;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 16px;
@@ -633,7 +643,7 @@ const ProfileName = styled.Text<ProfileNameProps>`
   font-size: ${(props: ProfileNameProps) =>
     props.$isCompact ? "12px" : "14px"};
   font-weight: 700;
-  color: #52525b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   max-width: ${(props: ProfileNameProps) =>
     props.$isCompact ? "60px" : "80px"};
 `;

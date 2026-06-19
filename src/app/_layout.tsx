@@ -1,23 +1,35 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 // Importamos o ActivityIndicator nativo do React Native
 import * as NavigationBar from "expo-navigation-bar";
 import { ActivityIndicator, Platform, View } from "react-native";
 
-import LogoSvg from "../assets/Group2.svg";
+import LogoSvgLight from "../assets/Group2.svg";
+import LogoSvgDark from "../assets/Group2d.svg";
 import { AppProvider, useAppContext } from "../context/AppContext";
+import { ThemeContextProvider, useThemeContext } from "../context/ThemeContext";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { profiles, isHydrated } = useAppContext();
+  const { isDark, colors } = useThemeContext();
   const segments = useSegments();
   const router = useRouter();
 
   const [minTimeDone, setMinTimeDone] = useState(false);
+
+  // Dynamically update the system navigation bar based on the active theme
+  useEffect(() => {
+    if (Platform.OS === "android" || Platform.OS === "ios") {
+      NavigationBar.setBackgroundColorAsync(colors.navigationBar);
+      NavigationBar.setButtonStyleAsync(colors.navigationBarButtons);
+    }
+  }, [colors]);
 
   useEffect(() => {
     SplashScreen.hideAsync();
@@ -73,6 +85,8 @@ function RootLayoutNav() {
     decideRoute();
   }, [profiles, isHydrated, segments, minTimeDone]);
 
+  const LogoSvg = isDark ? LogoSvgDark : LogoSvgLight;
+
   // 🔥 TELA DE LOADING SIMPLIFICADA APENAS COM O ACTIVITYINDICATOR NATIVO
   if (!isHydrated || !minTimeDone) {
     return (
@@ -81,7 +95,7 @@ function RootLayoutNav() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#fff",
+          backgroundColor: colors.background,
         }}
       >
         <View style={{ marginBottom: 40 }}>
@@ -110,19 +124,18 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  useEffect(() => {
-    // Essa configuração só se aplica ao Android
-    if (Platform.OS === "android" || Platform.OS === "ios") {
-      // 1. Define a cor de fundo da barra de botões (ex: branco ou a cor do seu app)
-      NavigationBar.setBackgroundColorAsync("#ffffff");
-
-      // 2. FORÇA os botões (voltar, home) a ficarem escuros/cinzas para contrastar com o fundo branco
-      NavigationBar.setButtonStyleAsync("dark");
-    }
-  }, []);
   return (
-    <AppProvider>
-      <RootLayoutNav />
-    </AppProvider>
+    <ThemeContextProvider>
+      <AppProvider>
+        <ThemedStatusBar />
+        <RootLayoutNav />
+      </AppProvider>
+    </ThemeContextProvider>
   );
+}
+
+/** Separate component so it can use useThemeContext inside the provider tree */
+function ThemedStatusBar() {
+  const { isDark } = useThemeContext();
+  return <StatusBar style={isDark ? "light" : "dark"} />;
 }

@@ -2,6 +2,9 @@ import {
   ChevronRight,
   FolderGit2,
   Globe,
+  Moon,
+  Smartphone,
+  Sun,
   Trash2,
   X,
 } from "lucide-react-native";
@@ -10,15 +13,29 @@ import { Linking, Modal, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import Group2Svg from "../assets/Group2.svg";
+import Group2dSvg from "../assets/Group2d.svg";
+import { ThemeColors } from "../constants/theme";
 import { useAppContext } from "../context/AppContext";
+import {
+  ThemePreference,
+  useThemeContext,
+} from "../context/ThemeContext";
 
 type SettingsModalProps = {
   visible: boolean;
   onRequestClose: () => void;
 };
 
+const THEME_OPTIONS: { key: ThemePreference; label: string; Icon: typeof Sun }[] = [
+  { key: "system", label: "Sistema", Icon: Smartphone },
+  { key: "light", label: "Claro", Icon: Sun },
+  { key: "dark", label: "Escuro", Icon: Moon },
+];
+
 export function SettingsModal({ visible, onRequestClose }: SettingsModalProps) {
   const { clearAllData } = useAppContext();
+  const { themePreference, setThemePreference, isDark, colors } =
+    useThemeContext();
   const insets = useSafeAreaInsets();
   const [isResetConfirmModalVisible, setIsResetConfirmModalVisible] =
     useState(false);
@@ -38,6 +55,8 @@ export function SettingsModal({ visible, onRequestClose }: SettingsModalProps) {
   const openPortfolio = () => {
     Linking.openURL("https://portfolio-ten-ashy-46.vercel.app/");
   };
+
+  const LogoSvg = isDark ? Group2dSvg : Group2Svg;
 
   return (
     <>
@@ -59,33 +78,62 @@ export function SettingsModal({ visible, onRequestClose }: SettingsModalProps) {
                   height: "100%",
                 }}
               >
-                <Group2Svg width={180} height={45} />
+                <LogoSvg width={180} height={45} />
               </View>
               <CloseButton onPress={onRequestClose}>
-                <X size={24} color="#71717a" />
+                <X size={24} color={colors.textMuted} />
               </CloseButton>
             </SettingsHeader>
 
             <SettingsBody>
+              {/* Theme Selector */}
+              <ThemeSelectorContainer>
+                <ThemeSelectorLabel>Aparência</ThemeSelectorLabel>
+                <ThemePillRow>
+                  {THEME_OPTIONS.map(({ key, label, Icon }) => {
+                    const isActive = themePreference === key;
+                    return (
+                      <ThemePill
+                        key={key}
+                        $isActive={isActive}
+                        onPress={() => setThemePreference(key)}
+                        activeOpacity={0.7}
+                      >
+                        <Icon
+                          size={16}
+                          color={
+                            isActive ? colors.accent : colors.textMuted
+                          }
+                        />
+                        <ThemePillText $isActive={isActive}>
+                          {label}
+                        </ThemePillText>
+                      </ThemePill>
+                    );
+                  })}
+                </ThemePillRow>
+              </ThemeSelectorContainer>
+
               <SettingDivider />
+
               <SettingRow onPress={() => setIsResetConfirmModalVisible(true)}>
                 <SettingRowLeft>
                   <SettingIconDanger>
-                    <Trash2 size={20} color="#ef4444" />
+                    <Trash2 size={20} color={colors.danger} />
                   </SettingIconDanger>
                   <SettingLabelDanger>Apagar todos os dados</SettingLabelDanger>
                 </SettingRowLeft>
-                <ChevronRight size={20} color="#d4d4d8" />
+                <ChevronRight size={20} color={colors.borderLight} />
               </SettingRow>
 
               <LinksContainer>
                 <LinksTitle>Conecte-se</LinksTitle>
                 <LinkRow onPress={openGithub} activeOpacity={0.7}>
-                  <FolderGit2 size={20} color="#71717a" />
+                  <FolderGit2 size={20} color={colors.textMuted} />
                   <LinkText>GitHub</LinkText>
                 </LinkRow>
                 <LinkRow onPress={openPortfolio} activeOpacity={0.7}>
-                  <Globe size={20} color="#71717a" />
+                  <Globe size={20} color={colors.textMuted} />
                   <LinkText>Portfólio Web</LinkText>
                 </LinkRow>
               </LinksContainer>
@@ -134,14 +182,16 @@ export function SettingsModal({ visible, onRequestClose }: SettingsModalProps) {
   );
 }
 
+// --- Styled Components ---
+
 const SettingsOverlay = styled.View`
   flex: 1;
-  background-color: rgba(9, 9, 11, 0.6);
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
   justify-content: flex-end;
 `;
 
 const SettingsSheet = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   border-top-left-radius: 32px;
   border-top-right-radius: 32px;
   padding: 24px;
@@ -172,6 +222,50 @@ const SettingsBody = styled.View`
   gap: 8px;
 `;
 
+// --- Theme Selector ---
+
+const ThemeSelectorContainer = styled.View`
+  margin-bottom: 8px;
+`;
+
+const ThemeSelectorLabel = styled.Text`
+  font-size: 13px;
+  font-weight: 800;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+`;
+
+const ThemePillRow = styled.View`
+  flex-direction: row;
+  gap: 8px;
+`;
+
+const ThemePill = styled.TouchableOpacity<{ $isActive: boolean }>`
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-vertical: 12px;
+  border-radius: 14px;
+  border-width: 2px;
+  border-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? theme.accent : theme.border};
+  background-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? theme.accentLight : theme.backgroundElement};
+`;
+
+const ThemePillText = styled.Text<{ $isActive: boolean }>`
+  font-size: 13px;
+  font-weight: 700;
+  color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? theme.accent : theme.textSecondary};
+`;
+
+// --- Setting Rows ---
+
 const SettingRow = styled.TouchableOpacity.attrs({ activeOpacity: 0.7 })`
   flex-direction: row;
   justify-content: space-between;
@@ -189,34 +283,34 @@ const SettingIconWrapper = styled.View`
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
 
 const SettingIconDanger = styled(SettingIconWrapper)`
-  background-color: #fef2f2;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.dangerLight};
 `;
 
 const SettingLabel = styled.Text`
   font-size: 16px;
   font-weight: 600;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const SettingLabelDanger = styled(SettingLabel)`
-  color: #ef4444;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
 `;
 
 const SettingDivider = styled.View`
   height: 1px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   margin-vertical: 4px;
 `;
 
 const LinksContainer = styled.View`
   margin-top: 24px;
-  background-color: #f8fafc;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 20px;
   padding: 20px;
   gap: 16px;
@@ -225,7 +319,7 @@ const LinksContainer = styled.View`
 const LinksTitle = styled.Text`
   font-size: 13px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -240,7 +334,7 @@ const LinkRow = styled.TouchableOpacity`
 const LinkText = styled.Text`
   font-size: 15px;
   font-weight: 600;
-  color: #52525b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
 `;
 
 const SettingsFooter = styled.View`
@@ -251,26 +345,28 @@ const SettingsFooter = styled.View`
 
 const FooterText = styled.Text`
   font-size: 12px;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 500;
 `;
 
 const FooterTextHighlight = styled.Text`
   font-size: 12px;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-weight: 700;
 `;
 
+// --- Confirm Modal ---
+
 const ConfirmOverlay = styled.View`
   flex: 1;
-  background-color: rgba(9, 9, 11, 0.7);
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
   align-items: center;
   justify-content: center;
   padding: 24px;
 `;
 
 const ConfirmContent = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   width: 100%;
   max-width: 340px;
   border-radius: 24px;
@@ -285,14 +381,14 @@ const ConfirmContent = styled.View`
 `;
 
 const ConfirmTitle = styled.Text`
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 18px;
   font-weight: 700;
   text-align: center;
 `;
 
 const ConfirmSubtitle = styled.Text`
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 8px;
   font-size: 13px;
   text-align: center;
@@ -309,16 +405,16 @@ const ActionButtonsContainer = styled.View`
 const ModalCancelButton = styled.TouchableOpacity`
   flex: 1;
   height: 48px;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 14px;
   align-items: center;
   justify-content: center;
   border-width: 1px;
-  border-color: #e4e4e7;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
 `;
 
 const ModalCancelText = styled.Text`
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-size: 14px;
   font-weight: 600;
 `;
@@ -326,7 +422,7 @@ const ModalCancelText = styled.Text`
 const ModalDeleteButton = styled.TouchableOpacity`
   flex: 1;
   height: 48px;
-  background-color: #ef4444;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
   border-radius: 14px;
   align-items: center;
   justify-content: center;

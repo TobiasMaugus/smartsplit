@@ -5,7 +5,9 @@ import { Animated, Modal, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { getInitials } from "../components/Avatar";
+import { ThemeColors } from "../constants/theme";
 import { useAppContext } from "../context/AppContext";
+import { useThemeContext } from "../context/ThemeContext";
 import { COLORS, MAX_PROFILES, ProfileForm } from "../types";
 
 const makeBlankForm = (index: number): ProfileForm => ({
@@ -20,6 +22,7 @@ const makeBlankForm = (index: number): ProfileForm => ({
 
 export default function SetupScreen() {
   const { profiles, setProfiles } = useAppContext();
+  const { colors, isDark } = useThemeContext();
   const [forms, setForms] = useState<ProfileForm[]>([]);
 
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -151,7 +154,7 @@ export default function SetupScreen() {
                 >
                   <Trash2
                     size={16}
-                    color={forms.length > 2 ? "#EF4444" : "#FCA5A5"}
+                    color={forms.length > 2 ? colors.danger : colors.dangerBorder}
                   />
                 </RemoveButton>
               </CardTopRow>
@@ -169,7 +172,7 @@ export default function SetupScreen() {
                     value={form.name}
                     onChangeText={(v) => upd(i, "name", v)}
                     placeholder={`Nome do perfil ${i + 1}`}
-                    placeholderTextColor="#A1A1AA"
+                    placeholderTextColor={colors.textMuted}
                   />
                 </InputContainer>
               </CardHeader>
@@ -197,9 +200,9 @@ export default function SetupScreen() {
                 activeOpacity={0.7}
               >
                 {form.showPix ? (
-                  <ChevronUp size={16} color="#A1A1AA" />
+                  <ChevronUp size={16} color={colors.textMuted} />
                 ) : (
-                  <ChevronDown size={16} color="#A1A1AA" />
+                  <ChevronDown size={16} color={colors.textMuted} />
                 )}
                 <PixToggleText>Dados Pix (opcional)</PixToggleText>
               </PixToggle>
@@ -223,7 +226,7 @@ export default function SetupScreen() {
                         value={form[k] as string}
                         onChangeText={(v) => upd(i, k, v)}
                         placeholder={ph}
-                        placeholderTextColor="#A1A1AA"
+                        placeholderTextColor={colors.textMuted}
                       />
                     </InputContainer>
                   ))}
@@ -234,7 +237,7 @@ export default function SetupScreen() {
 
           {forms.length < MAX_PROFILES && (
             <AddProfileButton onPress={addProfile} activeOpacity={0.8}>
-              <Plus size={20} color="#10B981" />
+              <Plus size={20} color={colors.accent} />
               <AddProfileText>Adicionar perfil</AddProfileText>
             </AddProfileButton>
           )}
@@ -297,7 +300,7 @@ export default function SetupScreen() {
 
 const Container = styled(SafeAreaView)`
   flex: 1;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 // 💡 Container Base com estilo Branco limpo e posicionado no Topo superior
@@ -306,12 +309,12 @@ const ToastContainerBase = styled.View`
   top: 60px;
   left: 32px;
   right: 32px;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   padding-vertical: 14px;
   padding-horizontal: 20px;
   border-radius: 20px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   align-items: center;
   justify-content: center;
 
@@ -328,7 +331,7 @@ const AnimatedToastContainer =
   Animated.createAnimatedComponent(ToastContainerBase);
 
 const ToastText = styled.Text`
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   font-size: 14px;
   font-weight: 700;
   text-align: center;
@@ -353,26 +356,26 @@ const Header = styled.View`
 const Title = styled.Text`
   font-size: 32px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   line-height: 38px;
   letter-spacing: -0.5px;
 `;
 
 const Subtitle = styled.Text`
   font-size: 15px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   margin-top: 12px;
   font-weight: 500;
   line-height: 22px;
 `;
 
 const Card = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
   border-radius: 20px;
   padding: 24px;
   margin-bottom: 20px;
   border-width: 1px;
-  border-color: #f4f4f5;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.05;
@@ -390,7 +393,7 @@ const CardTopRow = styled.View`
 const ProfileIndex = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
 `;
@@ -403,8 +406,8 @@ const RemoveButton = styled.TouchableOpacity<RemoveButtonProps>`
   width: 32px;
   height: 32px;
   border-radius: 16px;
-  background-color: ${(props: RemoveButtonProps) =>
-    props.$isDisabled ? "#F4F4F5" : "#fef2f2"};
+  background-color: ${({ $isDisabled, theme }: { $isDisabled?: boolean; theme: ThemeColors }) =>
+    $isDisabled ? theme.backgroundElement : theme.dangerLight};
   align-items: center;
   justify-content: center;
   opacity: ${(props: RemoveButtonProps) => (props.$isDisabled ? 0.45 : 1)};
@@ -439,7 +442,7 @@ const InputContainer = styled.View`
 const Label = styled.Text`
   font-size: 11px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -448,13 +451,13 @@ const Label = styled.Text`
 
 const StyledInput = styled.TextInput`
   width: 100%;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.inputBackground};
   border-radius: 12px;
   padding-vertical: 14px;
   padding-horizontal: 16px;
   font-size: 15px;
   font-weight: 600;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const Section = styled.View`
@@ -473,15 +476,13 @@ const ColorOption = styled.TouchableOpacity<{ $isSelected: boolean }>`
   border-radius: 18px;
   align-items: center;
   justify-content: center;
-  ${({ $isSelected }) =>
+  ${({ $isSelected, theme }) =>
     $isSelected &&
     `
-    /* 💡 CORREÇÃO: Mudamos de #FFFFFF (Branco) para #18181B (Grafite Escuro) */
     border-width: 3px;
-    border-color: #18181B; 
+    border-color: ${(theme as ThemeColors).text};
     transform: scale(1.15);
     
-    /* Mantemos a sombra para dar profundidade, mas agora ela não é a única responsável pela visualização */
     shadow-color: #000;
     shadow-offset: 0px;
     shadow-opacity: 0.2;
@@ -499,7 +500,7 @@ const PixToggle = styled.TouchableOpacity`
 const PixToggleText = styled.Text`
   font-size: 12px;
   font-weight: 800;
-  color: #a1a1aa;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-left: 8px;
@@ -518,7 +519,7 @@ const AddProfileButton = styled.TouchableOpacity`
   padding-vertical: 16px;
   border-radius: 16px;
   border-width: 2px;
-  border-color: #10b981;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
   border-style: dashed;
   margin-bottom: 8px;
 `;
@@ -526,7 +527,7 @@ const AddProfileButton = styled.TouchableOpacity`
 const AddProfileText = styled.Text`
   font-size: 15px;
   font-weight: 800;
-  color: #10b981;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
 `;
 
 const Spacing = styled.View`
@@ -537,7 +538,7 @@ const BottomContainer = styled.View`
   padding-horizontal: 24px;
   padding-bottom: 40px;
   padding-top: 16px;
-  background-color: #f4f6f9;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
 const SubmitButton = styled.TouchableOpacity<{ $isActive: boolean }>`
@@ -546,12 +547,13 @@ const SubmitButton = styled.TouchableOpacity<{ $isActive: boolean }>`
   border-radius: 16px;
   align-items: center;
   justify-content: center;
-  background-color: ${({ $isActive }) => ($isActive ? "#10B981" : "#E4E4E7")};
+  background-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? theme.accent : theme.borderLight};
 
-  ${({ $isActive }) =>
+  ${({ $isActive, theme }) =>
     $isActive &&
     `
-    shadow-color: #10B981;
+    shadow-color: ${(theme as ThemeColors).accent};
     shadow-offset: 0px 6px;
     shadow-opacity: 0.25;
     shadow-radius: 12px;
@@ -563,19 +565,20 @@ const SubmitButtonText = styled.Text<{ $isActive: boolean }>`
   font-weight: 800;
   font-size: 16px;
   letter-spacing: 0.3px;
-  color: ${({ $isActive }) => ($isActive ? "#FFFFFF" : "#A1A1AA")};
+  color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
+    $isActive ? "#FFFFFF" : theme.textMuted};
 `;
 
 const ConfirmOverlay = styled.View`
   flex: 1;
-  background-color: rgba(9, 9, 11, 0.5);
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
   justify-content: center;
   align-items: center;
   padding: 24px;
 `;
 
 const ConfirmContent = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   border-radius: 24px;
   padding: 24px;
   width: 100%;
@@ -590,14 +593,14 @@ const ConfirmContent = styled.View`
 const ConfirmTitle = styled.Text`
   font-size: 20px;
   font-weight: 900;
-  color: #18181b;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   margin-bottom: 8px;
   letter-spacing: -0.3px;
 `;
 
 const ConfirmSubtitle = styled.Text`
   font-size: 14px;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   line-height: 20px;
   font-weight: 500;
   margin-bottom: 24px;
@@ -610,7 +613,7 @@ const ActionButtonsContainer = styled.View`
 
 const ModalCancelButton = styled.TouchableOpacity`
   flex: 1;
-  background-color: #f4f4f5;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   padding-vertical: 14px;
   border-radius: 12px;
   align-items: center;
@@ -620,12 +623,12 @@ const ModalCancelButton = styled.TouchableOpacity`
 const ModalCancelText = styled.Text`
   font-size: 15px;
   font-weight: 700;
-  color: #71717a;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
 `;
 
 const ModalDeleteButton = styled.TouchableOpacity`
   flex: 1;
-  background-color: #ef4444;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.danger};
   padding-vertical: 14px;
   border-radius: 12px;
   align-items: center;

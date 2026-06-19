@@ -3,6 +3,7 @@ import { Check, Copy, X } from "lucide-react-native";
 import React, { useState } from "react";
 import { Modal, TouchableWithoutFeedback, View } from "react-native";
 import styled from "styled-components/native";
+import { ThemeColors } from "../constants/theme";
 import { Profile } from "../types";
 import { generatePixBRCode } from "../utils/pix";
 import { QRCodePix } from "./QRCodePix";
@@ -182,12 +183,12 @@ export function PixModal({
 
 const Backdrop = styled.View`
   flex: 1;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
   justify-content: flex-end;
 `;
 
 const Sheet = styled.View`
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   width: 100%;
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
@@ -197,7 +198,7 @@ const Sheet = styled.View`
 const Handle = styled.View`
   width: 40px;
   height: 4px;
-  background-color: #e5e7eb;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
   border-radius: 2px;
   align-self: center;
   margin-bottom: 20px;
@@ -213,14 +214,14 @@ const HeaderRow = styled.View`
 const SheetTitle = styled.Text`
   font-size: 20px;
   font-weight: 800;
-  color: #111827;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const CloseBtn = styled.TouchableOpacity`
   width: 32px;
   height: 32px;
   border-radius: 16px;
-  background-color: #f3f4f6;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -232,7 +233,7 @@ const AmountBox = styled.View`
 
 const AmountLabel = styled.Text`
   font-size: 11px;
-  color: #9ca3af;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -241,7 +242,7 @@ const AmountLabel = styled.Text`
 const AmountValue = styled.Text`
   font-size: 36px;
   font-weight: 900;
-  color: #111827;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
   margin-top: 4px;
 `;
 
@@ -254,12 +255,12 @@ const QRBorder = styled.View`
   padding: 16px;
   background-color: #ffffff;
   border-width: 2px;
-  border-color: #f3f4f6;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
   border-radius: 16px;
 `;
 
 const InfoCard = styled.View`
-  background-color: #f9fafb;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
@@ -278,7 +279,7 @@ const InfoContent = styled.View`
 
 const InfoLabel = styled.Text`
   font-size: 10px;
-  color: #9ca3af;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -288,12 +289,12 @@ const InfoLabel = styled.Text`
 const InfoValue = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #1f2937;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
 `;
 
 const InfoSub = styled.Text`
   font-size: 12px;
-  color: #9ca3af;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   margin-top: 2px;
 `;
 
@@ -302,16 +303,17 @@ const CopyBtn = styled.TouchableOpacity`
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background-color: #ffffff;
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
   border-radius: 12px;
   border-width: 1px;
-  border-color: #e5e7eb;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
 `;
 
 const CopyText = styled.Text<{ $success: boolean }>`
   font-size: 12px;
   font-weight: 700;
-  color: ${({ $success }) => ($success ? "#10B981" : "#4B5563")};
+  color: ${({ $success, theme }: { $success: boolean; theme: ThemeColors }) =>
+    $success ? theme.accent : theme.textSecondary};
 `;
 
 const CopyColRow = styled.View`
@@ -324,7 +326,7 @@ const CopyColRow = styled.View`
 const EmvText = styled.Text`
   flex: 1;
   font-size: 12px;
-  color: #6b7280;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-family: monospace;
 `;
 
@@ -342,13 +344,13 @@ const ActionBtn = styled.TouchableOpacity<{
   border-radius: 16px;
   align-items: center;
   justify-content: center;
-  background-color: ${({ $variant }) =>
-    $variant === "primary" ? "#10B981" : "#F3F4F6"};
+  background-color: ${({ $variant, theme }: { $variant: string; theme: ThemeColors }) =>
+    $variant === "primary" ? theme.accent : theme.backgroundElement};
 
-  ${({ $variant }) =>
+  ${({ $variant, theme }) =>
     $variant === "primary" &&
     `
-    shadow-color: #10B981;
+    shadow-color: ${(theme as ThemeColors).accent};
     shadow-offset: 0px 6px;
     shadow-opacity: 0.25;
     shadow-radius: 12px;
@@ -359,5 +361,6 @@ const ActionBtn = styled.TouchableOpacity<{
 const ActionText = styled.Text<{ $variant: "primary" | "secondary" }>`
   font-weight: 800;
   font-size: 16px;
-  color: ${({ $variant }) => ($variant === "primary" ? "#FFFFFF" : "#4B5563")};
+  color: ${({ $variant, theme }: { $variant: string; theme: ThemeColors }) =>
+    $variant === "primary" ? "#FFFFFF" : theme.textSecondary};
 `;
