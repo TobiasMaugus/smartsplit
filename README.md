@@ -1,56 +1,42 @@
-# Welcome to your Expo app 👋
+# SmartSplit 🛒💸
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+O **SmartSplit** é uma aplicação móvel moderna e intuitiva criada para resolver um problema clássico: **dividir a conta do supermercado de forma justa**.
 
-## Get started
+Acabaram-se as dores de cabeça com calculadoras! Com o SmartSplit, podes atribuir itens a pessoas específicas (inteiros ou fracionados) ou dividir itens de uso comum por todos, gerando no final um resumo perfeito com os valores exatos e links diretos para pagamento via PIX.
 
-1. Install dependencies
+## ✨ Funcionalidades
 
+- **Divisão Inteligente e Fracionada:** Permite dividir um único item por várias pessoas de forma exata (ex: metade de um bolo para o Tobias, metade para a Maria).
+- **Modo Coletivo:** Adiciona itens à lista de "Uso Comum" para dividir o valor por todos os participantes automaticamente.
+- **Gestão de Perfis:** Cria perfis temporários ou permanentes com cores personalizadas para facilitar a identificação visual.
+- **Integração PIX Completa:** Gera ligações/links diretos de pagamento PIX e QR Codes baseados no valor exato que cada pessoa deve.
+- **Partilha Limpa (WhatsApp):** Exporta o resumo da conta com formatação limpa (bullet points `•`) e os links de pagamento diretamente para o WhatsApp ou outros mensageiros.
+- **Histórico de Compras:** Guarda o registo das divisões passadas para poderes consultar quem pagou o quê numa data anterior.
+- **Suporte a Dark Mode:** Interface totalmente adaptativa (Light/Dark) baseada na preferência do sistema operativo ou escolhida manualmente.
+
+## 🛠️ Tecnologias Utilizadas
+
+A aplicação foi desenvolvida com foco em performance, tipagem estática e componentes reutilizáveis:
+
+- **[React Native](https://reactnative.dev/)** & **[Expo](https://expo.dev/)** (Framework Mobile)
+- **[Expo Router](https://docs.expo.dev/router/introduction/)** (Navegação baseada em ficheiros)
+- **[TypeScript](https://www.typescriptlang.org/)** (Tipagem forte e segurança no código)
+- **[Styled Components](https://styled-components.com/)** (Estilização avançada e gestão dinâmica de temas)
+- **[Lucide React Native](https://lucide.dev/)** (Ícones bonitos e consistentes)
+- **AsyncStorage** (Persistência de dados locais como histórico e preferências de tema)
+
+## 🚀 Como Executar o Projeto
+
+Segue os passos abaixo para correr a aplicação no teu ambiente local:
+
+### Pré-requisitos
+
+- [Node.js](https://nodejs.org/) instalado.
+- Aplicação **Expo Go** instalada no teu telemóvel (iOS ou Android) ou um emulador configurado.
+
+### Instalação
+
+1. Clona este repositório:
    ```bash
-   npm install
+   git clone [https://github.com/o-teu-utilizador/smartsplit.git](https://github.com/o-teu-utilizador/smartsplit.git)
    ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
