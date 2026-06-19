@@ -3,7 +3,8 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 // Importamos o ActivityIndicator nativo do React Native
-import { ActivityIndicator, View } from "react-native";
+import * as NavigationBar from "expo-navigation-bar";
+import { ActivityIndicator, Platform, View } from "react-native";
 
 import LogoSvg from "../assets/Group2.svg";
 import { AppProvider, useAppContext } from "../context/AppContext";
@@ -109,6 +110,16 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Essa configuração só se aplica ao Android
+    if (Platform.OS === "android" || Platform.OS === "ios") {
+      // 1. Define a cor de fundo da barra de botões (ex: branco ou a cor do seu app)
+      NavigationBar.setBackgroundColorAsync("#ffffff");
+
+      // 2. FORÇA os botões (voltar, home) a ficarem escuros/cinzas para contrastar com o fundo branco
+      NavigationBar.setButtonStyleAsync("dark");
+    }
+  }, []);
   return (
     <AppProvider>
       <RootLayoutNav />

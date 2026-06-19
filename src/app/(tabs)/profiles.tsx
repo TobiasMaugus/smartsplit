@@ -4,7 +4,6 @@ import {
   ChevronRight,
   FolderGit2,
   Globe,
-  Moon,
   Pencil,
   Settings,
   Trash2,
@@ -12,7 +11,7 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { Linking, Modal, Pressable, Switch, View } from "react-native";
+import { Linking, Modal, Pressable, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -234,7 +233,7 @@ export default function ProfilesScreen() {
             </SettingsHeader>
 
             <SettingsBody>
-              <SettingRow>
+              {/* <SettingRow>
                 <SettingRowLeft>
                   <SettingIconWrapper>
                     <Moon size={20} color="#18181b" />
@@ -247,7 +246,7 @@ export default function ProfilesScreen() {
                   trackColor={{ false: "#e4e4e7", true: "#6C63FF" }}
                   thumbColor="#ffffff"
                 />
-              </SettingRow>
+              </SettingRow> */}
 
               <SettingDivider />
 
