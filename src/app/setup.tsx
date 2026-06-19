@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { Modal, Platform } from "react-native";
+import { Animated, Modal, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { getInitials } from "../components/Avatar";
@@ -26,11 +26,12 @@ export default function SetupScreen() {
   const [profileToDeleteIndex, setProfileToDeleteIndex] = useState<
     number | null
   >(null);
+
+  // 💡 Estados para o Toast Customizado Animado e Branco no Topo
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastOpacity] = useState(new Animated.Value(0));
 
   useEffect(() => {
-    // Usamos o Math.max para garantir que, caso o seu MIN_PROFILES seja menor que 2,
-    // ele inicie a tela sempre com pelo menos 2 formulários no primeiro uso.
     if (profiles && profiles.length >= 2) {
       setForms(
         profiles.map((p) => ({
@@ -43,6 +44,29 @@ export default function SetupScreen() {
     }
   }, [profiles]);
 
+  // 💡 Função para disparar o aviso animado no topo com fade-out
+  const showCustomToast = (msg: string) => {
+    setToastMessage(msg);
+
+    // Faz o Toast aparecer subindo a opacidade para 1
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Aguarda 2.5 segundos e faz o efeito desaparecer suavemente
+    setTimeout(() => {
+      Animated.timing(toastOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastMessage(null);
+      });
+    }, 2500);
+  };
+
   const upd = (i: number, k: keyof ProfileForm, v: string | boolean) =>
     setForms((fs) => fs.map((f, j) => (j === i ? { ...f, [k]: v } : f)));
 
@@ -52,10 +76,8 @@ export default function SetupScreen() {
   };
 
   const removeProfile = (index: number) => {
-    // 🔥 CORREÇÃO AQUI: Travado rigidamente no número 2 em vez da variável
     if (forms.length <= 2) {
-      setToastMessage(`Não é possível ter menos de 2 perfis.`);
-      setTimeout(() => setToastMessage(null), 3000);
+      showCustomToast(`Não é possível ter menos de 2 perfis.`);
       return;
     }
 
@@ -71,7 +93,6 @@ export default function SetupScreen() {
     setProfileToDeleteIndex(null);
   };
 
-  // 🔥 CORREÇÃO AQUI: Só pode salvar se houver pelo menos 2 perfis
   const canGo =
     forms.length >= 2 && forms.every((f) => f.name.trim().length >= 2);
 
@@ -104,6 +125,13 @@ export default function SetupScreen() {
 
   return (
     <Container>
+      {/* 💡 Toast Animado adicionado no topo da tela */}
+      {toastMessage && (
+        <AnimatedToastContainer style={{ opacity: toastOpacity }}>
+          <ToastText>{toastMessage}</ToastText>
+        </AnimatedToastContainer>
+      )}
+
       <KeyboardWrapper behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollContent showsVerticalScrollIndicator={false}>
           <Header>
@@ -116,7 +144,6 @@ export default function SetupScreen() {
               <CardTopRow>
                 <ProfileIndex>Perfil {i + 1}</ProfileIndex>
 
-                {/* 🔥 CORREÇÃO AQUI: Estilos baseados rigidamente no número 2 */}
                 <RemoveButton
                   onPress={() => removeProfile(i)}
                   activeOpacity={forms.length > 2 ? 0.7 : 1}
@@ -259,12 +286,6 @@ export default function SetupScreen() {
           </ConfirmContent>
         </ConfirmOverlay>
       </Modal>
-
-      {toastMessage && (
-        <ToastContainer>
-          <ToastText>{toastMessage}</ToastText>
-        </ToastContainer>
-      )}
     </Container>
   );
 }
@@ -274,6 +295,41 @@ export default function SetupScreen() {
 const Container = styled(SafeAreaView)`
   flex: 1;
   background-color: #f4f6f9;
+`;
+
+// 💡 Container Base com estilo Branco limpo e posicionado no Topo superior
+const ToastContainerBase = styled.View`
+  position: absolute;
+  top: 60px;
+  left: 32px;
+  right: 32px;
+  background-color: #ffffff;
+  padding-vertical: 14px;
+  padding-horizontal: 20px;
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: #f4f4f5;
+  align-items: center;
+  justify-content: center;
+
+  shadow-color: #000;
+  shadow-offset: 0px 4px;
+  shadow-opacity: 0.05;
+  shadow-radius: 8px;
+  elevation: 4;
+  z-index: 9999;
+`;
+
+// Vincula o component com o sistema Animated do React Native
+const AnimatedToastContainer =
+  Animated.createAnimatedComponent(ToastContainerBase);
+
+const ToastText = styled.Text`
+  color: #18181b;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -0.2px;
 `;
 
 const KeyboardWrapper = styled.KeyboardAvoidingView`
@@ -421,7 +477,7 @@ const ColorOption = styled.TouchableOpacity<{ $isSelected: boolean }>`
     border-color: #FFFFFF;
     transform: scale(1.15);
     shadow-color: #000;
-    shadow-offset: 0px 2px;
+    shadow-offset: 0px;
     shadow-opacity: 0.2;
     shadow-radius: 4px;
     elevation: 4;
@@ -574,30 +630,4 @@ const ModalDeleteText = styled.Text`
   font-size: 15px;
   font-weight: 700;
   color: #ffffff;
-`;
-
-const ToastContainer = styled.View`
-  position: absolute;
-  bottom: 120px;
-  left: 32px;
-  right: 32px;
-  background-color: #18181b;
-  padding-vertical: 14px;
-  padding-horizontal: 20px;
-  border-radius: 14px;
-  align-items: center;
-  justify-content: center;
-  shadow-color: #000;
-  shadow-offset: 0px 4px;
-  shadow-opacity: 0.2;
-  shadow-radius: 8px;
-  elevation: 6;
-`;
-
-const ToastText = styled.Text`
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: -0.1px;
 `;

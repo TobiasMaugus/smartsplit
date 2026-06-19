@@ -8,7 +8,7 @@ import {
   User,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { Share, View } from "react-native";
+import { Animated, Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
@@ -68,6 +68,10 @@ export default function SummaryScreen() {
   const [wasSavedToHistory, setWasSavedToHistory] = useState(false);
   const [currentDebtorIndex, setCurrentDebtorIndex] = useState(0);
 
+  // 💡 Estados para o Toast Customizado com Animação
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastOpacity] = useState(new Animated.Value(0));
+
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
     0,
@@ -82,6 +86,29 @@ export default function SummaryScreen() {
   const isCompact = profiles.length > 4;
   const payerAvatarSize = isCompact ? "sm" : "lg";
   const breakdownAvatarSize = isCompact ? "xs" : "xs";
+
+  // 💡 Função para disparar o aviso animado no topo com fade-out
+  const showCustomToast = (msg: string) => {
+    setToastMessage(msg);
+
+    // Faz o Toast aparecer subindo a opacidade para 1
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Aguarda 2.5 segundos e faz o efeito desaparecer suavemente
+    setTimeout(() => {
+      Animated.timing(toastOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastMessage(null);
+      });
+    }, 2500);
+  };
 
   const checkAndSaveToHistory = (currentPayer: Profile) => {
     if (wasSavedToHistory) return;
@@ -148,7 +175,7 @@ export default function SummaryScreen() {
       scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "",
       `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
       `Pagador: ${payer.name}`,
-      `Chave PIX: ${payer.pixKey}\n`,
+      pixKey ? `Chave PIX: ${pixKey}\n` : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -182,6 +209,12 @@ export default function SummaryScreen() {
 
   const handleOpenPix = () => {
     if (!payer || validDebtors.length === 0) return;
+
+    if (!payer.pixKey) {
+      showCustomToast("Pagador não possui chave Pix cadastrada.");
+      return;
+    }
+
     checkAndSaveToHistory(payer);
     setCurrentDebtorIndex(0);
     setShowPix(true);
@@ -189,6 +222,13 @@ export default function SummaryScreen() {
 
   return (
     <Container>
+      {/* 💡 Toast Animado adicionado no topo da tela */}
+      {toastMessage && (
+        <AnimatedToastContainer style={{ opacity: toastOpacity }}>
+          <ToastText>{toastMessage}</ToastText>
+        </AnimatedToastContainer>
+      )}
+
       <Header>
         <BackButton onPress={() => router.back()} activeOpacity={0.7}>
           <ChevronLeft size={20} color="#A1A1AA" />
@@ -302,8 +342,15 @@ export default function SummaryScreen() {
 
                         {(shares[o.id] ?? 0) > 0 && (
                           <MiniQrButton
+                            $disabled={!payer?.pixKey}
                             activeOpacity={0.7}
                             onPress={() => {
+                              if (!payer?.pixKey) {
+                                showCustomToast(
+                                  "Pagador não possui chave Pix cadastrada.",
+                                );
+                                return;
+                              }
                               checkAndSaveToHistory(payer!);
                               const idx = validDebtors.findIndex(
                                 (d: Profile) => d.id === o.id,
@@ -314,7 +361,10 @@ export default function SummaryScreen() {
                               }
                             }}
                           >
-                            <QrCode size={16} color="#10B981" />
+                            <QrCode
+                              size={16}
+                              color={payer?.pixKey ? "#10B981" : "#A1A1AA"}
+                            />
                           </MiniQrButton>
                         )}
                       </View>
@@ -362,20 +412,27 @@ export default function SummaryScreen() {
           </ActionButton>
 
           <ActionButton
-            disabled={!payerId || validDebtors.length === 0}
             onPress={handleOpenPix}
             $variant={
-              payerId && validDebtors.length > 0 ? "primary" : "disabled"
+              payerId && validDebtors.length > 0 && payer?.pixKey
+                ? "primary"
+                : "disabled"
             }
             activeOpacity={0.8}
           >
             <QrCode
               size={18}
-              color={payerId && validDebtors.length > 0 ? "#FFFFFF" : "#A1A1AA"}
+              color={
+                payerId && validDebtors.length > 0 && payer?.pixKey
+                  ? "#FFFFFF"
+                  : "#A1A1AA"
+              }
             />
             <ActionText
               $variant={
-                payerId && validDebtors.length > 0 ? "primary" : "disabled"
+                payerId && validDebtors.length > 0 && payer?.pixKey
+                  ? "primary"
+                  : "disabled"
               }
             >
               Gerar Pix
@@ -384,12 +441,11 @@ export default function SummaryScreen() {
         </ButtonRow>
       </BottomBar>
 
-      {/* MODAL DO PIX: Agora envia o devedor e os controles de Anterior/Próximo */}
       {showPix && payer && validDebtors.length > 0 && (
         <PixModal
           visible={showPix}
           profile={payer}
-          debtor={validDebtors[currentDebtorIndex]} // Enviamos o devedor
+          debtor={validDebtors[currentDebtorIndex]}
           amount={shares[validDebtors[currentDebtorIndex]?.id] ?? 0}
           onClose={() => setShowPix(false)}
           onNext={
@@ -413,6 +469,41 @@ export default function SummaryScreen() {
 const Container = styled(SafeAreaView)`
   flex: 1;
   background-color: #f4f6f9;
+`;
+
+// 💡 Container Base com estilo Branco limpo e posicionado no Topo superior
+const ToastContainerBase = styled.View`
+  position: absolute;
+  top: 60px;
+  left: 32px;
+  right: 32px;
+  background-color: #ffffff;
+  padding-vertical: 14px;
+  padding-horizontal: 20px;
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: #f4f4f5;
+  align-items: center;
+  justify-content: center;
+
+  shadow-color: #000;
+  shadow-offset: 0px 4px;
+  shadow-opacity: 0.05;
+  shadow-radius: 8px;
+  elevation: 4;
+  z-index: 9999;
+`;
+
+// Vincula o component com o sistema Animated do React Native
+const AnimatedToastContainer =
+  Animated.createAnimatedComponent(ToastContainerBase);
+
+const ToastText = styled.Text`
+  color: #18181b;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -0.2px;
 `;
 
 const Header = styled.View`
@@ -647,12 +738,12 @@ const OwningValue = styled.Text<{ $isCompact?: boolean }>`
   color: #10b981;
 `;
 
-const MiniQrButton = styled.TouchableOpacity`
-  background-color: #ffffff;
+const MiniQrButton = styled.TouchableOpacity<{ $disabled?: boolean }>`
+  background-color: ${({ $disabled }) => ($disabled ? "#FAFAFA" : "#ffffff")};
   padding: 6px;
   border-radius: 10px;
   border-width: 1px;
-  border-color: #d1fae5;
+  border-color: ${({ $disabled }) => ($disabled ? "#E4E4E7" : "#d1fae5")};
 `;
 
 const EmptyOwning = styled.Text`
