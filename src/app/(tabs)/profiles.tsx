@@ -244,7 +244,7 @@ export default function ProfilesScreen() {
                 <Switch
                   value={isDarkMode}
                   onValueChange={setIsDarkMode}
-                  trackColor={{ false: "#e4e4e7", true: "#10b981" }}
+                  trackColor={{ false: "#e4e4e7", true: "#6C63FF" }}
                   thumbColor="#ffffff"
                 />
               </SettingRow>
