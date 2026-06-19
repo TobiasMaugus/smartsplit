@@ -25,6 +25,7 @@ interface AppContextType {
   restoreHistoryEntry: (entry: HistoryEntry) => void;
   updateHistoryEntry: (entry: HistoryEntry) => void;
   loadMockData: () => void;
+  clearAllData: () => Promise<void>; // Tipagem da nova função
   isHydrated: boolean;
   scrapedMarket: string;
   setScrapedMarket: React.Dispatch<React.SetStateAction<string>>;
@@ -45,7 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allocs, setAllocs] = useState<Allocations>({});
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  // 🔥 CORREÇÃO: Os estados agora estão no lugar certo (dentro do AppProvider)
+  // Os estados agora estão no lugar certo (dentro do AppProvider)
   const [scrapedMarket, setScrapedMarket] = useState("");
   const [scrapedDate, setScrapedDate] = useState("");
   const [scrapedTime, setScrapedTime] = useState("");
@@ -80,6 +81,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHistoryEntries((prev) =>
       prev.map((h) => (h.id === entry.id ? entry : h)),
     );
+  };
+
+  // 🔥 NOVA FUNÇÃO: Limpa todos os estados e o armazenamento físico local
+  const clearAllData = async () => {
+    try {
+      setProfiles([]);
+      setHistoryEntries([]);
+      setItems([]);
+      setAllocs({});
+      setEditingEntry(null);
+      setScrapedMarket("");
+      setScrapedDate("");
+      setScrapedTime("");
+
+      await Promise.all([
+        AsyncStorage.removeItem(HISTORY_KEY),
+        AsyncStorage.removeItem(PROFILES_KEY),
+      ]);
+      console.log("AppProvider: Todos os dados foram resetados.");
+    } catch (e) {
+      console.error("Erro ao resetar dados do AsyncStorage", e);
+    }
   };
 
   // 1. CARREGA OS DADOS DO DISPOSITIVO AO INICIAR
@@ -169,6 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         restoreHistoryEntry,
         updateHistoryEntry,
         loadMockData,
+        clearAllData, // Exportado com sucesso aqui
         isHydrated,
         scrapedMarket,
         setScrapedMarket,
@@ -188,5 +212,6 @@ export function useAppContext() {
   if (context === undefined) {
     throw new Error("useAppContext must be used within an AppProvider");
   }
+
   return context;
 }
