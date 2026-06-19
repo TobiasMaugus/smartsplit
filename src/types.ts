@@ -37,6 +37,7 @@ export interface HistoryEntry {
   items?: GroceryItem[];
   // Mapeamento de alocação por item: allocs[itemId][profileId] = unidades
   allocs?: Allocations;
+  participants?: Profile[]; // 👈 ADICIONE ESTA LINHA AQUI
 }
 
 export const COLORS = [
@@ -52,3 +53,10 @@ export const COLORS = [
 ];
 
 export const COLLECTIVE = "__collective__";
+
+export const MIN_PROFILES = 1;
+export const MAX_PROFILES = 11;
+
+export function getCollectiveLabel(profileCount: number): string {
+  return profileCount === 2 ? "Ambos" : "Todos";
+}

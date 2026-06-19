@@ -56,12 +56,12 @@ function RootLayoutNav() {
           safeSegments.includes("setup") || safeSegments[0] === "setup";
         const isAtRoot = safeSegments.length === 0;
 
-        if (storedCount < 2 && !currentIsSetup) {
+        if (storedCount < 1 && !currentIsSetup) {
           await router.replace("/setup");
           return;
         }
 
-        if (storedCount >= 2 && isAtRoot) {
+        if (storedCount >= 1 && isAtRoot) {
           await router.replace("/(tabs)");
           return;
         }

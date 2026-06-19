@@ -75,6 +75,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScrapedDate(entry.dateCompra ?? "");
     setScrapedTime(entry.horarioCompra ?? "");
     setEditingEntry(entry);
+
+    if (entry.participants && entry.participants.length > 0) {
+      setProfiles((prevProfiles) => {
+        const updatedProfiles = [...prevProfiles];
+
+        entry.participants!.forEach((pastProfile) => {
+          // Se o perfil da época não existe mais na lista atual do app, nós o resgatamos
+          const exists = updatedProfiles.some((p) => p.id === pastProfile.id);
+          if (!exists) {
+            updatedProfiles.push(pastProfile);
+          }
+        });
+
+        return updatedProfiles;
+      });
+    }
   };
 
   const updateHistoryEntry = (entry: HistoryEntry) => {

@@ -83,11 +83,24 @@ export default function HistoryScreen() {
                       <PriceText>{fmt(e.total)}</PriceText>
 
                       {/* Fluxo de pagamento verticalizado */}
+                      {/* Fluxo de pagamento verticalizado */}
+                      {/* Fluxo de pagamento verticalizado */}
                       <SplitDetailsContainer>
                         <PayerText numberOfLines={1}>
-                          {e.payer.name.split(" ")[0]} pagou tudo
+                          {e.payer.name.split(" ")[0]} pagou
                         </PayerText>
-                        <DebtorText numberOfLines={1}>• {e.desc}</DebtorText>
+
+                        {/* Quebra apenas nas vírgulas seguidas de espaço, preservando os centavos (ex: R$ 17,56) */}
+                        {e.desc.split(/,\s+/).map((debtor, index) => {
+                          const trimmedDebtor = debtor.trim();
+                          if (!trimmedDebtor) return null; // Evita linhas vazias
+
+                          return (
+                            <DebtorText key={index} numberOfLines={1}>
+                              • {trimmedDebtor}
+                            </DebtorText>
+                          );
+                        })}
                       </SplitDetailsContainer>
 
                       {/* Bloco de datas alinhado perfeitamente à esquerda */}
@@ -98,15 +111,12 @@ export default function HistoryScreen() {
                           {e.horario ? ` às ${e.horario}` : null}
                         </DateText>
 
-                        {/* 📅 DATA 2: Exibe a data real APENAS se for diferente de hoje */}
-                        {showPurchaseDate ? (
-                          <PurchaseDateText numberOfLines={1}>
-                            📅 Nota: {/* @ts-ignore */}
-                            {e.dateCompra}
-                            {/* @ts-ignore */}
-                            {e.horarioCompra ? ` às ${e.horarioCompra}` : null}
-                          </PurchaseDateText>
-                        ) : null}
+                        <PurchaseDateText numberOfLines={1}>
+                          📅 Nota: {/* @ts-ignore */}
+                          {e.dateCompra}
+                          {/* @ts-ignore */}
+                          {e.horarioCompra ? ` às ${e.horarioCompra}` : null}
+                        </PurchaseDateText>
                       </DatesContainer>
                     </CardBody>
 

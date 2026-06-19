@@ -14,7 +14,13 @@ import styled from "styled-components/native";
 import { Avatar } from "../components/Avatar";
 import { PixModal } from "../components/PixModal";
 import { useAppContext } from "../context/AppContext";
-import { Allocations, GroceryItem, HistoryEntry, Profile } from "../types";
+import {
+  Allocations,
+  COLLECTIVE,
+  GroceryItem,
+  HistoryEntry,
+  Profile,
+} from "../types";
 import { generatePixBRCode } from "../utils/pix";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
@@ -31,7 +37,7 @@ const computeShares = (
   items.forEach((item) => {
     Object.entries(allocs[item.id] ?? {}).forEach(([pid, units]) => {
       const cost = units * item.unitPrice;
-      if (pid === "__collective__") {
+      if (pid === COLLECTIVE) {
         profiles.forEach((p) => {
           s[p.id] += cost / profiles.length;
         });
@@ -50,8 +56,8 @@ export default function SummaryScreen() {
     items,
     historyEntries,
     setHistoryEntries,
-    scrapedMarket, // 🔥 Puxado do Contexto Global
-    scrapedDate, // 🔥 Puxado do Contexto Global
+    scrapedMarket,
+    scrapedDate,
     scrapedTime,
     editingEntry,
     setEditingEntry,
@@ -60,17 +66,23 @@ export default function SummaryScreen() {
   const [payerId, setPayerId] = useState<string | null>(null);
   const [showPix, setShowPix] = useState(false);
   const [wasSavedToHistory, setWasSavedToHistory] = useState(false);
+  const [currentDebtorIndex, setCurrentDebtorIndex] = useState(0);
 
   const PURCHASE_TOTAL = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
     0,
   );
+
   const shares = computeShares(allocs, profiles, items);
   const payer = profiles.find((p) => p.id === payerId);
   const others = profiles.filter((p) => p.id !== payerId);
-  const owingTotal = others.reduce((s, p) => s + (shares[p.id] ?? 0), 0);
 
-  // 1. Função Centralizada de Salvamento
+  const validDebtors = others.filter((o: Profile) => (shares[o.id] ?? 0) > 0);
+
+  const isCompact = profiles.length > 4;
+  const payerAvatarSize = isCompact ? "sm" : "lg";
+  const breakdownAvatarSize = isCompact ? "xs" : "xs";
+
   const checkAndSaveToHistory = (currentPayer: Profile) => {
     if (wasSavedToHistory) return;
     const quantidadeHistorico = 15;
@@ -90,19 +102,17 @@ export default function SummaryScreen() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      // Persistimos a lista de itens e a alocação atual
       items: items,
       allocs: allocs,
+      participants: profiles,
     };
 
     if (editingEntry) {
-      // Sobrescreve o histórico existente
       setHistoryEntries((prev) =>
         prev.map((h) => (h.id === baseEntry.id ? baseEntry : h)),
       );
       setEditingEntry(null);
     } else {
-      // Novo histórico
       setHistoryEntries(
         [baseEntry, ...historyEntries].slice(0, quantidadeHistorico),
       );
@@ -111,7 +121,6 @@ export default function SummaryScreen() {
     setWasSavedToHistory(true);
   };
 
-  // Quando entramos em modo de edição, preenchermos o pagador automaticamente
   useEffect(() => {
     if (editingEntry) {
       setPayerId(editingEntry.payer.id);
@@ -119,16 +128,12 @@ export default function SummaryScreen() {
     }
   }, [editingEntry]);
 
-  // 2. Ação: Salvar e Voltar direto
   const handleSaveAndExit = () => {
     if (!payer) return;
     checkAndSaveToHistory(payer);
     router.replace("/(tabs)");
   };
 
-  // 3. Ação: Compartilhar
-  // 3. Ação: Compartilhar
-  // 3. Ação: Compartilhar
   const shareAndClose = async () => {
     if (!payer) return;
 
@@ -137,48 +142,48 @@ export default function SummaryScreen() {
     const pixKey = payer.pixKey || "";
     const pixName = payer.pixName || payer.name;
     const pixCity = payer.pixCity || "São Paulo";
-    const emvCode = pixKey
-      ? generatePixBRCode(pixKey, owingTotal, pixName, pixCity)
-      : "";
 
-    const debtLines = others.map(
-      (o) => `• ${o.name.split(" ")[0]} deve ${fmt(shares[o.id] ?? 0)}`,
-    );
-
-    // Separamos o bloco de resumo do bloco do Pix Copia e Cola
     const messageBlock = [
       `💰 Divisão Concluída!`,
       scrapedMarket ? `🛒 Local: ${scrapedMarket}` : "",
       `Total da compra: ${fmt(PURCHASE_TOTAL)}`,
-      `Pagador: ${payer.name} \n`,
-      `Chave PIX: ${payer.pixKey} \n`,
-      debtLines,
+      `Pagador: ${payer.name}`,
+      `Chave PIX: ${payer.pixKey}\n`,
     ]
       .filter(Boolean)
       .join("\n");
 
-    // 🔥 Geramos o link codificado de forma segura para o seu site do GitHub Pages
-    const safePixCode = encodeURIComponent(emvCode);
-    const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
+    const debtLines = validDebtors.map((o: Profile) => {
+      const valorIndividual = shares[o.id] ?? 0;
+      let texto = `${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
 
-    // 🔥 Montamos o texto final com o Link do site LOGO ACIMA do código copia e cola tradicional
-    const message = pixKey
-      ? `${messageBlock}\n\n🔗 *Pagar pelo Navegador (QR Code):*\n${pixLink}\n\n` // 📋 *Pix Copia e Cola (Toque para copiar):*\n\`\`\`${emvCode}\`\`\`
-      : messageBlock;
+      if (pixKey) {
+        const emvCode = generatePixBRCode(
+          pixKey,
+          valorIndividual,
+          pixName,
+          pixCity,
+        );
+        const safePixCode = encodeURIComponent(emvCode);
+        const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
+        texto += `\n${pixLink}`;
+      }
+      return texto;
+    });
+
+    const message = `${messageBlock}\n${debtLines.join("\n\n")}`;
 
     try {
       await Share.share({ message });
     } catch (e) {
-      // Utilizador cancelou a partilha
+      // Usuário cancelou o compartilhamento
     }
-
-    router.replace("/(tabs)");
   };
 
-  // 4. Ação: Gerar Pix
   const handleOpenPix = () => {
-    if (!payer) return;
+    if (!payer || validDebtors.length === 0) return;
     checkAndSaveToHistory(payer);
+    setCurrentDebtorIndex(0);
     setShowPix(true);
   };
 
@@ -194,7 +199,6 @@ export default function SummaryScreen() {
       </Header>
 
       <ScrollContent showsVerticalScrollIndicator={false}>
-        {/* Card Total da Compra */}
         <TotalCard>
           <View>
             <TotalLabel>Total da Compra</TotalLabel>
@@ -205,13 +209,13 @@ export default function SummaryScreen() {
           </TotalIconBox>
         </TotalCard>
 
-        {/* Seleção de Pagador */}
         <Card>
           <CardLabel>Pagador</CardLabel>
-          <PayerRow>
+          <PayerRow $isCompact={isCompact}>
             {profiles.map((p) => (
               <PayerButton
                 key={p.id}
+                $isCompact={isCompact}
                 onPress={() => {
                   setPayerId(p.id);
                   setWasSavedToHistory(false);
@@ -219,30 +223,39 @@ export default function SummaryScreen() {
                 activeOpacity={0.7}
                 $isActive={payerId === p.id}
               >
-                <Avatar name={p.name} color={p.color} size="lg" />
-                <PayerName>{p.name.split(" ")[0]}</PayerName>
-                {payerId === p.id && <PayerStatus>✓ Selecionado</PayerStatus>}
+                <Avatar name={p.name} color={p.color} size={payerAvatarSize} />
+                <PayerName $isCompact={isCompact}>
+                  {p.name.split(" ")[0]}
+                </PayerName>
+                {payerId === p.id && (
+                  <PayerStatus $isCompact={isCompact}>
+                    ✓ Selecionado
+                  </PayerStatus>
+                )}
               </PayerButton>
             ))}
           </PayerRow>
         </Card>
 
-        {/* Detalhes do Rateio */}
         {payerId && (
           <View style={{ gap: 16 }}>
             <Card style={{ marginBottom: 0 }}>
               <CardLabel style={{ marginBottom: 16 }}>Rateio</CardLabel>
-              <BreakdownList>
+              <BreakdownList $isCompact={isCompact}>
                 {profiles.map((p) => (
-                  <BreakdownItem key={p.id}>
-                    <Avatar name={p.name} color={p.color} size="xs" />
+                  <BreakdownItem key={p.id} $isCompact={isCompact}>
+                    <Avatar
+                      name={p.name}
+                      color={p.color}
+                      size={breakdownAvatarSize}
+                    />
                     <BreakdownInfo>
                       <BreakdownHeader>
-                        <BreakdownName>
+                        <BreakdownName $isCompact={isCompact}>
                           {p.name.split(" ")[0]}
                           {p.id === payerId ? " (pagou)" : ""}
                         </BreakdownName>
-                        <BreakdownValue>
+                        <BreakdownValue $isCompact={isCompact}>
                           {fmt(shares[p.id] ?? 0)}
                         </BreakdownValue>
                       </BreakdownHeader>
@@ -261,15 +274,50 @@ export default function SummaryScreen() {
 
               <Divider />
 
-              <OwningBox>
+              <OwningBox $isCompact={isCompact}>
                 {others.length > 0 ? (
-                  others.map((o) => (
+                  others.map((o: Profile) => (
                     <OwningItem key={o.id}>
                       <OwningUser>
-                        <Avatar name={o.name} color={o.color} size="xs" />
-                        <OwningText>{o.name.split(" ")[0]} te deve</OwningText>
+                        <Avatar
+                          name={o.name}
+                          color={o.color}
+                          size={breakdownAvatarSize}
+                        />
+                        <OwningText $isCompact={isCompact}>
+                          {o.name.split(" ")[0]} te deve
+                        </OwningText>
                       </OwningUser>
-                      <OwningValue>{fmt(shares[o.id] ?? 0)}</OwningValue>
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <OwningValue $isCompact={isCompact}>
+                          {fmt(shares[o.id] ?? 0)}
+                        </OwningValue>
+
+                        {(shares[o.id] ?? 0) > 0 && (
+                          <MiniQrButton
+                            activeOpacity={0.7}
+                            onPress={() => {
+                              checkAndSaveToHistory(payer!);
+                              const idx = validDebtors.findIndex(
+                                (d: Profile) => d.id === o.id,
+                              );
+                              if (idx !== -1) {
+                                setCurrentDebtorIndex(idx);
+                                setShowPix(true);
+                              }
+                            }}
+                          >
+                            <QrCode size={16} color="#10B981" />
+                          </MiniQrButton>
+                        )}
+                      </View>
                     </OwningItem>
                   ))
                 ) : (
@@ -285,7 +333,6 @@ export default function SummaryScreen() {
           </View>
         )}
 
-        {/* Placeholder caso não haja pagador */}
         {!payerId && (
           <EmptyPayerBox>
             <EmptyPayerIcon>
@@ -300,7 +347,6 @@ export default function SummaryScreen() {
         <Spacing />
       </ScrollContent>
 
-      {/* Footer / Ações */}
       <BottomBar>
         <ButtonRow>
           <ActionButton
@@ -316,25 +362,46 @@ export default function SummaryScreen() {
           </ActionButton>
 
           <ActionButton
-            disabled={!payerId}
+            disabled={!payerId || validDebtors.length === 0}
             onPress={handleOpenPix}
-            $variant={payerId ? "primary" : "disabled"}
+            $variant={
+              payerId && validDebtors.length > 0 ? "primary" : "disabled"
+            }
             activeOpacity={0.8}
           >
-            <QrCode size={18} color={payerId ? "#FFFFFF" : "#A1A1AA"} />
-            <ActionText $variant={payerId ? "primary" : "disabled"}>
+            <QrCode
+              size={18}
+              color={payerId && validDebtors.length > 0 ? "#FFFFFF" : "#A1A1AA"}
+            />
+            <ActionText
+              $variant={
+                payerId && validDebtors.length > 0 ? "primary" : "disabled"
+              }
+            >
               Gerar Pix
             </ActionText>
           </ActionButton>
         </ButtonRow>
       </BottomBar>
 
-      {showPix && payer && (
+      {/* MODAL DO PIX: Agora envia o devedor e os controles de Anterior/Próximo */}
+      {showPix && payer && validDebtors.length > 0 && (
         <PixModal
           visible={showPix}
           profile={payer}
-          amount={owingTotal}
+          debtor={validDebtors[currentDebtorIndex]} // Enviamos o devedor
+          amount={shares[validDebtors[currentDebtorIndex]?.id] ?? 0}
           onClose={() => setShowPix(false)}
+          onNext={
+            currentDebtorIndex < validDebtors.length - 1
+              ? () => setCurrentDebtorIndex(currentDebtorIndex + 1)
+              : undefined
+          }
+          onPrevious={
+            currentDebtorIndex > 0
+              ? () => setCurrentDebtorIndex(currentDebtorIndex - 1)
+              : undefined
+          }
         />
       )}
     </Container>
@@ -453,18 +520,26 @@ const CardLabel = styled.Text`
   margin-bottom: 12px;
 `;
 
-const PayerRow = styled.View`
+const PayerRow = styled.View<{ $isCompact?: boolean }>`
   flex-direction: row;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: ${({ $isCompact }) => ($isCompact ? "8px" : "12px")};
+  justify-content: center;
 `;
 
-const PayerButton = styled.TouchableOpacity<{ $isActive: boolean }>`
-  flex: 1;
+const PayerButton = styled.TouchableOpacity<{
+  $isActive: boolean;
+  $isCompact?: boolean;
+}>`
   align-items: center;
-  gap: 10px;
-  padding-vertical: 20px;
-  border-radius: 20px;
+  gap: ${({ $isCompact }) => ($isCompact ? "6px" : "10px")};
+  padding-vertical: ${({ $isCompact }) => ($isCompact ? "12px 8px" : "20px")};
+  padding-horizontal: ${({ $isCompact }) => ($isCompact ? "8px" : "12px")};
+  border-radius: ${({ $isCompact }) => ($isCompact ? "16px" : "20px")};
   border-width: 2px;
+  width: ${({ $isCompact }) => ($isCompact ? "30%" : "46%")};
+  min-width: ${({ $isCompact }) => ($isCompact ? "90px" : "120px")};
+  max-width: ${({ $isCompact }) => ($isCompact ? "110px" : "160px")};
 
   ${({ $isActive }) =>
     $isActive
@@ -478,26 +553,27 @@ const PayerButton = styled.TouchableOpacity<{ $isActive: boolean }>`
   `}
 `;
 
-const PayerName = styled.Text`
-  font-size: 15px;
+const PayerName = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "13px" : "15px")};
   font-weight: 900;
   color: #18181b;
+  text-align: center;
 `;
 
-const PayerStatus = styled.Text`
-  font-size: 12px;
+const PayerStatus = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "10px" : "12px")};
   font-weight: 800;
   color: #10b981;
 `;
 
-const BreakdownList = styled.View`
-  gap: 16px;
+const BreakdownList = styled.View<{ $isCompact?: boolean }>`
+  gap: ${({ $isCompact }) => ($isCompact ? "10px" : "16px")};
 `;
 
-const BreakdownItem = styled.View`
+const BreakdownItem = styled.View<{ $isCompact?: boolean }>`
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: ${({ $isCompact }) => ($isCompact ? "8px" : "12px")};
 `;
 
 const BreakdownInfo = styled.View`
@@ -510,14 +586,14 @@ const BreakdownHeader = styled.View`
   margin-bottom: 6px;
 `;
 
-const BreakdownName = styled.Text`
-  font-size: 14px;
+const BreakdownName = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 800;
   color: #18181b;
 `;
 
-const BreakdownValue = styled.Text`
-  font-size: 14px;
+const BreakdownValue = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 800;
   color: #18181b;
 `;
@@ -540,11 +616,11 @@ const Divider = styled.View`
   margin-vertical: 16px;
 `;
 
-const OwningBox = styled.View`
+const OwningBox = styled.View<{ $isCompact?: boolean }>`
   background-color: #ecfdf5;
   border-radius: 16px;
-  padding: 16px;
-  gap: 12px;
+  padding: ${({ $isCompact }) => ($isCompact ? "12px" : "16px")};
+  gap: ${({ $isCompact }) => ($isCompact ? "8px" : "12px")};
 `;
 
 const OwningItem = styled.View`
@@ -559,16 +635,24 @@ const OwningUser = styled.View`
   gap: 8px;
 `;
 
-const OwningText = styled.Text`
-  font-size: 14px;
+const OwningText = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "12px" : "14px")};
   font-weight: 600;
   color: #3f3f46;
 `;
 
-const OwningValue = styled.Text`
-  font-size: 16px;
+const OwningValue = styled.Text<{ $isCompact?: boolean }>`
+  font-size: ${({ $isCompact }) => ($isCompact ? "14px" : "16px")};
   font-weight: 900;
   color: #10b981;
+`;
+
+const MiniQrButton = styled.TouchableOpacity`
+  background-color: #ffffff;
+  padding: 6px;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: #d1fae5;
 `;
 
 const EmptyOwning = styled.Text`

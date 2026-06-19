@@ -19,6 +19,8 @@ export default function MainScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
   const [isTorchOn, setIsTorchOn] = useState(false);
+  const isCompactProfiles = profiles.length > 5;
+  const profileAvatarSize = isCompactProfiles ? "xs" : "sm";
 
   const onScan = async () => {
     if (!permission?.granted) {
@@ -39,7 +41,6 @@ export default function MainScreen() {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
 
-      // 🔥 INTERCEPTA OS LOGS DO WEBVIEW E IMPRIME NO TERMINAL DO EXPO
       if (msg.type === "LOG") {
         console.log(`[WebScraping] ${msg.message}`);
         return;
@@ -248,7 +249,6 @@ export default function MainScreen() {
           enableTorch={isTorchOn}
         >
           <CameraOverlay>
-            {/* 1. BOTÃO DA LANTERNA (Topo Esquerdo) */}
             <TouchableOpacity
               onPress={() => setIsTorchOn(!isTorchOn)}
               style={{
@@ -260,7 +260,6 @@ export default function MainScreen() {
                 justifyContent: "center",
                 alignItems: "center",
                 borderRadius: 22,
-                // 🔥 ALTERADO: Quando desligada, o fundo fica mais escuro (0.6) para igualar ao outro botão
                 backgroundColor: isTorchOn
                   ? "rgba(255, 255, 255, 0.3)"
                   : "rgba(0, 0, 0, 0.6)",
@@ -270,7 +269,6 @@ export default function MainScreen() {
               <Zap size={24} color={isTorchOn ? "#FFCC00" : "#FFFFFF"} />
             </TouchableOpacity>
 
-            {/* 2. BOTÃO DE FECHAR (Topo Direito) */}
             <CloseCameraButton
               onPress={() => setIsScanning(false)}
               style={{
@@ -284,7 +282,6 @@ export default function MainScreen() {
               <X size={24} color="#FFFFFF" />
             </CloseCameraButton>
 
-            {/* Componentes centrais */}
             <ScanArea />
             <ScanText>Aponte para o QR Code da nota fiscal</ScanText>
           </CameraOverlay>
@@ -294,7 +291,8 @@ export default function MainScreen() {
   }
 
   return (
-    <Container>
+    /* 🔥 CORREÇÃO: Forçando a SafeAreaView a ignorar a borda 'bottom' */
+    <Container edges={["top", "left", "right"]}>
       {scannedUrl && (
         <View
           style={{
@@ -326,9 +324,6 @@ export default function MainScreen() {
               elevation: 8,
             }}
           >
-            {/* Definir uma largura e altura numéricas fixas resolve o bug do espaço fantasma. 
-        Ajuste o height abaixo proporcionalmente ao design do seu LogoSvg2 (ex: se for mais horizontal, algo entre 40 e 60 funciona perfeitamente).
-      */}
             <LogoSvg2
               width={180}
               height={50}
@@ -439,11 +434,15 @@ export default function MainScreen() {
 
         <Footer>
           <FooterLabel>Perfis ativos</FooterLabel>
-          <ProfilesRow>
+          <ProfilesRow $isCompact={isCompactProfiles}>
             {profiles.map((p) => (
               <ProfileBadge key={p.id}>
-                <Avatar name={p.name} color={p.color} size="sm" />
-                <ProfileName numberOfLines={1}>
+                <Avatar
+                  name={p.name}
+                  color={p.color}
+                  size={profileAvatarSize}
+                />
+                <ProfileName $isCompact={isCompactProfiles} numberOfLines={1}>
                   {p.name.split(" ")[0]}
                 </ProfileName>
               </ProfileBadge>
@@ -454,6 +453,10 @@ export default function MainScreen() {
     </Container>
   );
 }
+
+type ProfileNameProps = {
+  $isCompact?: boolean;
+};
 
 // --- Styled Components ---
 
@@ -467,7 +470,7 @@ const ScrollContent = styled.ScrollView.attrs({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 32,
-    paddingBottom: 24,
+    paddingBottom: 16, // Reduzido levemente para um encaixe mais elegante perto da tab
   },
 })`
   flex: 1;
@@ -595,25 +598,31 @@ const FooterLabel = styled.Text`
   margin-bottom: 16px;
 `;
 
-const ProfilesRow = styled.View`
+type ProfilesRowProps = {
+  $isCompact?: boolean;
+};
+
+const ProfilesRow = styled.View<ProfilesRowProps>`
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: ${(props: ProfilesRowProps) => (props.$isCompact ? "10px" : "20px")};
   flex-wrap: wrap;
 `;
 
 const ProfileBadge = styled.View`
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 `;
 
-const ProfileName = styled.Text`
-  font-size: 14px;
+const ProfileName = styled.Text<ProfileNameProps>`
+  font-size: ${(props: ProfileNameProps) =>
+    props.$isCompact ? "12px" : "14px"};
   font-weight: 700;
   color: #52525b;
-  max-width: 80px;
+  max-width: ${(props: ProfileNameProps) =>
+    props.$isCompact ? "60px" : "80px"};
 `;
 
 const CameraOverlay = styled.View`

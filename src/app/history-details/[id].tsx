@@ -1,12 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft } from "lucide-react-native";
-import React, { useState } from "react";
-import { Modal, ScrollView, View } from "react-native";
+import { ChevronLeft, Share2 } from "lucide-react-native";
+import React, { useMemo, useState } from "react";
+import { Modal, ScrollView, Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { Avatar } from "../../components/Avatar";
 import { useAppContext } from "../../context/AppContext";
-import { COLLECTIVE, GroceryItem } from "../../types";
+import {
+  COLLECTIVE,
+  GroceryItem,
+  Profile,
+  getCollectiveLabel,
+} from "../../types";
+import { generatePixBRCode } from "../../utils/pix";
+
+const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 export default function HistoryDetail() {
   const params = useLocalSearchParams();
@@ -16,11 +24,45 @@ export default function HistoryDetail() {
     useAppContext();
 
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-
-  // Estado para controlar o filtro ativo (null = Todos, COLLECTIVE = Ambos, ou o ID do perfil)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const entry = historyEntries.find((h) => h.id === id);
+  const collectiveLabel = getCollectiveLabel(profiles.length);
+
+  // Mapeia os perfis dando prioridade para o "Snapshot" (participants) salvo na hora da compra
+  const involvedProfiles = useMemo(() => {
+    if (!entry) return [];
+
+    const referenceProfiles =
+      entry.participants && entry.participants.length > 0
+        ? entry.participants
+        : profiles;
+
+    const ids = new Set<string>();
+    if (entry.payer?.id) ids.add(entry.payer.id);
+
+    entry.items?.forEach((it: GroceryItem) => {
+      const alloc = entry.allocs?.[it.id] ?? {};
+      Object.entries(alloc).forEach(([pid, units]) => {
+        if (pid !== COLLECTIVE && units > 0) {
+          ids.add(pid);
+        }
+      });
+    });
+
+    return Array.from(ids).map((pid) => {
+      if (pid === entry.payer?.id) return entry.payer;
+
+      const found = referenceProfiles.find((p: Profile) => p.id === pid);
+      if (found) return found;
+
+      return {
+        id: pid,
+        name: "Perfil Excluído",
+        color: "#A1A1AA",
+      } as Profile;
+    });
+  }, [entry, profiles]);
 
   if (!entry) {
     return (
@@ -49,10 +91,90 @@ export default function HistoryDetail() {
     router.push("/processing");
   };
 
-  // Filtra os itens com base no botão selecionado
+  // Função para compartilhar a divisão com a formatação idêntica ao Summary
+  const handleShare = async () => {
+    try {
+      const payer = entry.payer;
+      const pixKey = payer.pixKey || "";
+      const pixName = payer.pixName || payer.name;
+      const pixCity = payer.pixCity || "São Paulo";
+
+      // Usa os perfis da época para garantir a precisão da divisão
+      const participants =
+        entry.participants && entry.participants.length > 0
+          ? entry.participants
+          : profiles;
+
+      // Calcula os totais devidos por cada um
+      const totals: Record<string, number> = {};
+      participants.forEach((p) => (totals[p.id] = 0));
+
+      entry.items?.forEach((it) => {
+        const alloc = entry.allocs?.[it.id] ?? {};
+        Object.entries(alloc).forEach(([pid, units]) => {
+          if (units > 0) {
+            const cost = units * it.unitPrice;
+            if (pid === COLLECTIVE) {
+              const splitValue = cost / participants.length;
+              participants.forEach((p) => {
+                totals[p.id] = (totals[p.id] || 0) + splitValue;
+              });
+            } else {
+              totals[pid] = (totals[pid] || 0) + cost;
+            }
+          }
+        });
+      });
+
+      const validDebtors = participants.filter(
+        (p) => p.id !== payer.id && totals[p.id] > 0,
+      );
+
+      // Bloco de cabeçalho idêntico ao SummaryScreen
+      const messageBlock = [
+        `💰 Divisão Concluída!`,
+        entry.marketName ? `🛒 Local: ${entry.marketName}` : "",
+        `Total da compra: ${fmt(entry.total)}`,
+        `Pagador: ${payer.name}`,
+        `Chave PIX: ${pixKey}\n`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      // Geração de linhas de débitos com o link do seu site
+      const debtLines = validDebtors.map((o: Profile) => {
+        const valorIndividual = totals[o.id] ?? 0;
+        let texto = `${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
+
+        if (pixKey) {
+          const emvCode = generatePixBRCode(
+            pixKey,
+            valorIndividual,
+            pixName,
+            pixCity,
+          );
+          const safePixCode = encodeURIComponent(emvCode);
+          const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
+          texto += `\n${pixLink}`;
+        }
+        return texto;
+      });
+
+      const message = `${messageBlock}\n${debtLines.join("\n\n")}`;
+
+      await Share.share({ message });
+    } catch (error) {
+      console.error("Erro ao compartilhar:", error);
+    }
+  };
+
+  const hasCollective = entry.items?.some(
+    (it) => (entry.allocs?.[it.id]?.[COLLECTIVE] ?? 0) > 0,
+  );
+
   const filteredItems =
     entry.items?.filter((it: GroceryItem) => {
-      if (!selectedFilter) return true; // Mostrar Todos
+      if (!selectedFilter) return true;
       const alloc = entry.allocs?.[it.id] ?? {};
       return alloc[selectedFilter] !== undefined && alloc[selectedFilter] > 0;
     }) ?? [];
@@ -74,7 +196,15 @@ export default function HistoryDetail() {
         <Top>
           <Avatar name={entry.payer.name} color={entry.payer.color} size="lg" />
           <TopInfo>
-            <Market>{entry.marketName || "Supermercado"}</Market>
+            <MarketRow>
+              <Market numberOfLines={1}>
+                {entry.marketName || "Supermercado"}
+              </Market>
+              {/* Botão de cobrança atualizado: Novo ícone e maior */}
+              <ShareBtn onPress={handleShare} activeOpacity={0.7}>
+                <Share2 size={40} color="#10b981" />
+              </ShareBtn>
+            </MarketRow>
             <Meta>
               <MetaText>{entry.date}</MetaText>
               {entry.horario ? <MetaText>às {entry.horario}</MetaText> : null}
@@ -85,7 +215,6 @@ export default function HistoryDetail() {
 
         <Divider />
 
-        {/* --- Barra Horizontal de Filtros --- */}
         <FilterScrollWrapper>
           <ScrollView
             horizontal
@@ -98,21 +227,23 @@ export default function HistoryDetail() {
               activeOpacity={0.7}
             >
               <FilterPillText $active={selectedFilter === null}>
-                Todos
+                Todos os itens
               </FilterPillText>
             </FilterPill>
 
-            <FilterPill
-              $active={selectedFilter === COLLECTIVE}
-              onPress={() => setSelectedFilter(COLLECTIVE)}
-              activeOpacity={0.7}
-            >
-              <FilterPillText $active={selectedFilter === COLLECTIVE}>
-                Ambos
-              </FilterPillText>
-            </FilterPill>
+            {hasCollective && (
+              <FilterPill
+                $active={selectedFilter === COLLECTIVE}
+                onPress={() => setSelectedFilter(COLLECTIVE)}
+                activeOpacity={0.7}
+              >
+                <FilterPillText $active={selectedFilter === COLLECTIVE}>
+                  Uso Coletivo
+                </FilterPillText>
+              </FilterPill>
+            )}
 
-            {profiles.map((p) => (
+            {involvedProfiles.map((p) => (
               <FilterPill
                 key={p.id}
                 $active={selectedFilter === p.id}
@@ -155,14 +286,14 @@ export default function HistoryDetail() {
 
                   <AllocationsWrapper>
                     {allocEntries.map(([pid, units]) => {
-                      const isShared = pid === COLLECTIVE;
+                      if (units <= 0) return null;
                       const cost = units * it.unitPrice;
 
-                      if (isShared) {
+                      if (pid === COLLECTIVE) {
                         return (
                           <AllocRow key={COLLECTIVE}>
                             <SharedBadge>
-                              <SharedBadgeText>Ambos</SharedBadgeText>
+                              <SharedBadgeText>USO COLETIVO</SharedBadgeText>
                             </SharedBadge>
                             <AllocText>
                               {units} {units === 1 ? "unidade" : "unidades"} ·
@@ -172,7 +303,9 @@ export default function HistoryDetail() {
                         );
                       }
 
-                      const profile = profiles.find((p) => p.id === pid);
+                      const profile = involvedProfiles.find(
+                        (p) => p.id === pid,
+                      );
                       if (!profile) return null;
 
                       return (
@@ -215,7 +348,6 @@ export default function HistoryDetail() {
         </PrimaryButton>
       </Footer>
 
-      {/* Modal Customizado de Confirmação de Exclusão */}
       <Modal
         visible={isDeleteModalVisible}
         transparent
@@ -250,7 +382,7 @@ export default function HistoryDetail() {
 }
 
 // ==========================================
-// STYLED COMPONENTS (Limpos e sem duplicação)
+// STYLED COMPONENTS
 // ==========================================
 
 const Container = styled(SafeAreaView)`
@@ -303,18 +435,47 @@ const Top = styled.View`
   margin-top: 8px;
 `;
 
-const TopInfo = styled.View``;
+const TopInfo = styled.View`
+  flex: 1;
+`;
+
+const MarketRow = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+`;
 
 const Market = styled.Text`
   font-size: 16px;
   font-weight: 800;
   color: #18181b;
+  flex: 1;
+  margin-right: 8px;
+`;
+
+const ShareBtn = styled.TouchableOpacity`
+  padding: 10px;
+  background-color: #ecfdf5;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+
+  /* 💡 Move o botão exatamente 4px para baixo de forma isolada, */
+  /* sem empurrar o texto do supermercado ou as datas! */
+  transform: translateY(20px);
 `;
 
 const Meta = styled.View`
   flex-direction: row;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 0px; /* Removido o gap superior */
+`;
+
+const Total = styled.Text`
+  font-size: 20px;
+  font-weight: 900;
+  color: #10b981;
+  margin-top: 0px; /* Removido o gap superior */
 `;
 
 const MetaText = styled.Text`
@@ -323,20 +484,12 @@ const MetaText = styled.Text`
   font-weight: 600;
 `;
 
-const Total = styled.Text`
-  font-size: 20px;
-  font-weight: 900;
-  color: #10b981;
-  margin-top: 6px;
-`;
-
 const Divider = styled.View`
   height: 1px;
   background-color: #eef2f7;
   margin-vertical: 16px;
 `;
 
-// --- Estilos da Nova Barra de Filtros ---
 const FilterScrollWrapper = styled.View`
   margin-horizontal: -24px;
   margin-bottom: 20px;
@@ -358,7 +511,6 @@ const FilterPillText = styled.Text<{ $active: boolean }>`
   font-weight: 600;
   color: ${({ $active }) => ($active ? "#FFFFFF" : "#71717A")};
 `;
-// ----------------------------------------
 
 const Section = styled.View``;
 
@@ -469,8 +621,6 @@ const DangerText = styled.Text`
   color: #ff4757;
   font-weight: 800;
 `;
-
-// --- Styled Components do Novo Modal de Exclusão ---
 
 const ModalOverlay = styled.View`
   position: absolute;

@@ -1,22 +1,33 @@
-import React, { useState } from "react";
-import { Modal, TouchableWithoutFeedback } from "react-native";
-import { X, Copy, Check } from "lucide-react-native";
-import { Profile } from "../types";
 import * as Clipboard from "expo-clipboard";
+import { Check, Copy, X } from "lucide-react-native";
+import React, { useState } from "react";
+import { Modal, TouchableWithoutFeedback, View } from "react-native";
+import styled from "styled-components/native";
+import { Profile } from "../types";
 import { generatePixBRCode } from "../utils/pix";
 import { QRCodePix } from "./QRCodePix";
-import styled from "styled-components/native";
 
 interface PixModalProps {
-  profile: Profile;
+  profile: Profile; // Quem vai receber (Pagador)
+  debtor?: Profile; // Quem vai pagar (Devedor atual)
   amount: number;
   onClose: () => void;
   visible: boolean;
+  onNext?: () => void;
+  onPrevious?: () => void;
 }
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
-export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
+export function PixModal({
+  profile,
+  debtor,
+  amount,
+  onClose,
+  visible,
+  onNext,
+  onPrevious,
+}: PixModalProps) {
   const [copied, setCopied] = useState<string | null>(null);
 
   const pixKey = profile.pixKey || "11999887766";
@@ -33,7 +44,12 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <TouchableWithoutFeedback onPress={onClose}>
         <Backdrop>
           <TouchableWithoutFeedback>
@@ -41,7 +57,13 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
               <Handle />
 
               <HeaderRow>
-                <SheetTitle>Gerar Pix</SheetTitle>
+                <View>
+                  <SheetTitle>
+                    {debtor
+                      ? `Cobrança para ${debtor.name.split(" ")[0]}`
+                      : "Gerar Pix"}
+                  </SheetTitle>
+                </View>
                 <CloseBtn onPress={onClose} activeOpacity={0.7}>
                   <X size={16} color="#4B5563" />
                 </CloseBtn>
@@ -69,11 +91,18 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
               <InfoCard>
                 <InfoRow>
                   <InfoContent>
-                    <InfoLabel>Chave Pix</InfoLabel>
+                    <InfoLabel>
+                      Chave Pix de {profile.name.split(" ")[0]}
+                    </InfoLabel>
                     <InfoValue numberOfLines={1}>{pixKey}</InfoValue>
-                    <InfoSub numberOfLines={1}>{pixName} · {pixCity}</InfoSub>
+                    <InfoSub numberOfLines={1}>
+                      {pixName} · {pixCity}
+                    </InfoSub>
                   </InfoContent>
-                  <CopyBtn onPress={() => copy(pixKey, "key")} activeOpacity={0.7}>
+                  <CopyBtn
+                    onPress={() => copy(pixKey, "key")}
+                    activeOpacity={0.7}
+                  >
                     {copied === "key" ? (
                       <Check size={14} color="#10B981" />
                     ) : (
@@ -91,7 +120,10 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
                 <InfoLabel>Copia e Cola</InfoLabel>
                 <CopyColRow>
                   <EmvText numberOfLines={1}>{emvCode}</EmvText>
-                  <CopyBtn onPress={() => copy(emvCode, "code")} activeOpacity={0.7}>
+                  <CopyBtn
+                    onPress={() => copy(emvCode, "code")}
+                    activeOpacity={0.7}
+                  >
                     {copied === "code" ? (
                       <Check size={14} color="#10B981" />
                     ) : (
@@ -104,10 +136,40 @@ export function PixModal({ profile, amount, onClose, visible }: PixModalProps) {
                 </CopyColRow>
               </InfoCard>
 
-              {/* Botão OK */}
-              <OkButton onPress={onClose} activeOpacity={0.85}>
-                <OkText>OK</OkText>
-              </OkButton>
+              {/* Botões de Navegação */}
+              <FooterRow>
+                {/* Se existir "Anterior" e ainda houver "Próximo" (QR Code Intermediário) */}
+                {onPrevious && onNext && (
+                  <ActionBtn
+                    $variant="secondary"
+                    onPress={onPrevious}
+                    activeOpacity={0.85}
+                  >
+                    <ActionText $variant="secondary">Anterior</ActionText>
+                  </ActionBtn>
+                )}
+
+                {/* Lógica do botão principal */}
+                {!onNext ? (
+                  // ÚLTIMO ou ÚNICO QR Code: Botão único de OK fechando o modal
+                  <ActionBtn
+                    $variant="primary"
+                    onPress={onClose}
+                    activeOpacity={0.85}
+                  >
+                    <ActionText $variant="primary">OK</ActionText>
+                  </ActionBtn>
+                ) : (
+                  // PRIMEIRO ou INTERMEDIÁRIO: Botão de Próximo
+                  <ActionBtn
+                    $variant="primary"
+                    onPress={onNext}
+                    activeOpacity={0.85}
+                  >
+                    <ActionText $variant="primary">Próximo</ActionText>
+                  </ActionBtn>
+                )}
+              </FooterRow>
             </Sheet>
           </TouchableWithoutFeedback>
         </Backdrop>
@@ -125,7 +187,7 @@ const Backdrop = styled.View`
 `;
 
 const Sheet = styled.View`
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   width: 100%;
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
@@ -135,7 +197,7 @@ const Sheet = styled.View`
 const Handle = styled.View`
   width: 40px;
   height: 4px;
-  background-color: #E5E7EB;
+  background-color: #e5e7eb;
   border-radius: 2px;
   align-self: center;
   margin-bottom: 20px;
@@ -158,7 +220,7 @@ const CloseBtn = styled.TouchableOpacity`
   width: 32px;
   height: 32px;
   border-radius: 16px;
-  background-color: #F3F4F6;
+  background-color: #f3f4f6;
   align-items: center;
   justify-content: center;
 `;
@@ -170,7 +232,7 @@ const AmountBox = styled.View`
 
 const AmountLabel = styled.Text`
   font-size: 11px;
-  color: #9CA3AF;
+  color: #9ca3af;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -190,14 +252,14 @@ const QRWrapper = styled.View`
 
 const QRBorder = styled.View`
   padding: 16px;
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-width: 2px;
-  border-color: #F3F4F6;
+  border-color: #f3f4f6;
   border-radius: 16px;
 `;
 
 const InfoCard = styled.View`
-  background-color: #F9FAFB;
+  background-color: #f9fafb;
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
@@ -216,7 +278,7 @@ const InfoContent = styled.View`
 
 const InfoLabel = styled.Text`
   font-size: 10px;
-  color: #9CA3AF;
+  color: #9ca3af;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -226,12 +288,12 @@ const InfoLabel = styled.Text`
 const InfoValue = styled.Text`
   font-size: 14px;
   font-weight: 800;
-  color: #1F2937;
+  color: #1f2937;
 `;
 
 const InfoSub = styled.Text`
   font-size: 12px;
-  color: #9CA3AF;
+  color: #9ca3af;
   margin-top: 2px;
 `;
 
@@ -240,10 +302,10 @@ const CopyBtn = styled.TouchableOpacity`
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-radius: 12px;
   border-width: 1px;
-  border-color: #E5E7EB;
+  border-color: #e5e7eb;
 `;
 
 const CopyText = styled.Text<{ $success: boolean }>`
@@ -262,28 +324,40 @@ const CopyColRow = styled.View`
 const EmvText = styled.Text`
   flex: 1;
   font-size: 12px;
-  color: #6B7280;
+  color: #6b7280;
   font-family: monospace;
 `;
 
-const OkButton = styled.TouchableOpacity`
-  width: 100%;
+const FooterRow = styled.View`
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 4px;
+`;
+
+const ActionBtn = styled.TouchableOpacity<{
+  $variant: "primary" | "secondary";
+}>`
+  flex: 1;
   padding: 16px 0;
-  background-color: #10B981;
   border-radius: 16px;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
+  background-color: ${({ $variant }) =>
+    $variant === "primary" ? "#10B981" : "#F3F4F6"};
 
-  shadow-color: #10B981;
-  shadow-offset: 0px 6px;
-  shadow-opacity: 0.25;
-  shadow-radius: 12px;
-  elevation: 4;
+  ${({ $variant }) =>
+    $variant === "primary" &&
+    `
+    shadow-color: #10B981;
+    shadow-offset: 0px 6px;
+    shadow-opacity: 0.25;
+    shadow-radius: 12px;
+    elevation: 4;
+  `}
 `;
 
-const OkText = styled.Text`
-  color: #FFFFFF;
+const ActionText = styled.Text<{ $variant: "primary" | "secondary" }>`
   font-weight: 800;
   font-size: 16px;
+  color: ${({ $variant }) => ($variant === "primary" ? "#FFFFFF" : "#4B5563")};
 `;
