@@ -24,19 +24,32 @@ import {
 import { generatePixBRCode } from "../utils/pix";
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
-
 const computeShares = (
   allocs: Allocations,
   profiles: Profile[],
   items: GroceryItem[],
 ): Record<string, number> => {
   const s: Record<string, number> = {};
+
+  // LOG DE ENTRADA: Para ver se a função sequer é iniciada
+  console.log("=== INICIANDO COMPUTE SHARES ===");
+  console.log("Alocações recebidas:", JSON.stringify(allocs, null, 2));
+  console.log("Itens recebidos:", JSON.stringify(items, null, 2));
+
   profiles.forEach((p) => {
     s[p.id] = 0;
   });
+
   items.forEach((item) => {
-    Object.entries(allocs[item.id] ?? {}).forEach(([pid, units]) => {
+    const itemAllocs = allocs[item.id] ?? {};
+
+    Object.entries(itemAllocs).forEach(([pid, units]) => {
       const cost = units * item.unitPrice;
+
+      console.log(
+        `Item: ${item.name} | Para: ${pid} | Qtd/Frações: ${units} | Custo Calculado: ${cost}`,
+      );
+
       if (pid === COLLECTIVE) {
         profiles.forEach((p) => {
           s[p.id] += cost / profiles.length;
@@ -46,6 +59,9 @@ const computeShares = (
       }
     });
   });
+
+  console.log("Resultado Final das Contas:", s);
+  console.log("================================");
   return s;
 };
 

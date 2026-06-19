@@ -119,11 +119,11 @@ export default function ProcessingScreen() {
     if (!newAllocs[cur.id]) newAllocs[cur.id] = {};
 
     if (personalizado && pids.length > 1) {
-      const each = Math.floor(units / pids.length);
-      const extra = units % pids.length;
-      pids.forEach((pid, i) => {
-        newAllocs[cur.id][pid] =
-          (newAllocs[cur.id][pid] ?? 0) + each + (i === 0 ? extra : 0);
+      // 💡 CORREÇÃO: Divisão fracionada exata, sem Math.floor ou resto
+      const each = units / pids.length;
+
+      pids.forEach((pid) => {
+        newAllocs[cur.id][pid] = (newAllocs[cur.id][pid] ?? 0) + each;
       });
     } else {
       newAllocs[cur.id][profileId] =
