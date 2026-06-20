@@ -37,7 +37,8 @@ export interface HistoryEntry {
   items?: GroceryItem[];
   // Mapeamento de alocação por item: allocs[itemId][profileId] = unidades
   allocs?: Allocations;
-  participants?: Profile[]; // 👈 ADICIONE ESTA LINHA AQUI
+  participants?: Profile[];
+  paidStatus?: Record<string, boolean>;
 }
 
 export const COLORS = [
