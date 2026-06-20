@@ -1,35 +1,58 @@
-import { Tabs } from "expo-router";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import { withLayoutContext } from "expo-router";
 import { History, ShoppingBag, User } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeContext } from "../../context/ThemeContext";
 import "../../global.css";
+
+// 1. Cria o navegador de arrastar compatível com o Expo Router
+const { Navigator } = createMaterialTopTabNavigator();
+const SwipeableTabs = withLayoutContext(Navigator);
 
 export default function TabLayout() {
   const { colors } = useThemeContext();
 
+  // Para garantir que a aba não fique escondida atrás da barrinha do iPhone
+  const insets = useSafeAreaInsets();
+
   return (
-    <Tabs
+    <SwipeableTabs
+      initialRouteName="index" // Começa na aba do meio (Adicionar)
+      tabBarPosition="bottom" // 💡 Joga a barra lá para o rodapé
       screenOptions={{
-        headerShown: false,
+        swipeEnabled: true,
+        tabBarShowIcon: true,
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
-        // 1. IMPORTANTE: Remova ou comente a altura fixa se os textos sumirem,
-        // pois as abas nativas calculam o padding de forma estrita.
+        animationEnabled: false,
+
+        // 💡 2. Só carrega a tela quando o usuário realmente for para ela (melhora muito a performance)
+        lazy: true,
+        lazyPreloadDistance: 1,
+
+        tabBarIndicatorStyle: {
+          backgroundColor: colors.tabBarActive,
+          height: 1, // 💡 Diminuído de 3 para 2 (ou coloque 1 se quiser bem fininha)
+          top: 0,
+        },
+
         tabBarStyle: {
+          backgroundColor: colors.backgroundElevated,
           borderTopWidth: 1,
           borderTopColor: colors.tabBarBorder,
-          backgroundColor: colors.backgroundElevated,
+          paddingBottom: insets.bottom,
+          height: 60 + insets.bottom, // 💡 Diminuído de 60 para 52 para reduzir a altura do menu
         },
-        // 2. Ajuste o objeto de estilo para o formato que a aba nativa espera
+
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "bold",
+          textTransform: "none",
+          marginTop: 0,
         },
-        // 3. Força o Android a sempre renderizar as labels (baseado na sua tipagem)
-        // @ts-ignore - caso o expo-router repasse diretamente para o driver nativo
-        labelVisibilityMode: "labeled",
       }}
     >
-      <Tabs.Screen
+      <SwipeableTabs.Screen
         name="profiles"
         options={{
           title: "Perfis",
@@ -38,7 +61,8 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+
+      <SwipeableTabs.Screen
         name="index"
         options={{
           title: "Adicionar",
@@ -51,7 +75,8 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+
+      <SwipeableTabs.Screen
         name="history"
         options={{
           title: "Histórico",
@@ -60,6 +85,6 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+    </SwipeableTabs>
   );
 }

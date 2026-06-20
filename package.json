@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/material-top-tabs": "^7.6.2",
     "@shopify/react-native-skia": "2.2.12",
     "babel-preset-expo": "~54.0.10",
     "dijkstrajs": "^1.0.3",
@@ -31,6 +32,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-pager-view": "^8.0.2",
     "react-native-qrcode-skia": "^0.4.0",
     "react-native-qrcode-svg": "^6.3.21",
     "react-native-reanimated": "~4.1.1",

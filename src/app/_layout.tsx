@@ -35,7 +35,7 @@ function RootLayoutNav() {
     SplashScreen.hideAsync();
     const timer = setTimeout(() => {
       setMinTimeDone(true);
-    }, 2000);
+    }, 1000);
     return () => clearTimeout(timer);
   }, []);
 
