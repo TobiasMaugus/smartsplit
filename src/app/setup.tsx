@@ -11,7 +11,7 @@ import { useThemeContext } from "../context/ThemeContext";
 import { COLORS, MAX_PROFILES, ProfileForm } from "../types";
 
 // ==========================================
-// FUNÇÕES DE VALIDAÇÃO (Extraídas do pix.ts)
+// FUNÇÕES DE VALIDAÇÃO MATEMÁTICA
 // ==========================================
 const isValidCPF = (cpf: string): boolean => {
   if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
@@ -54,6 +54,55 @@ const isValidCNPJ = (cnpj: string): boolean => {
 };
 
 // ==========================================
+// 🧠 NOVO: CENTRAL DE VALIDAÇÃO DO PIX
+// (Usada tanto pelo Input quanto pelo Botão Salvar)
+// ==========================================
+const validatePixKey = (value: string) => {
+  if (!value) return { type: "", isValid: false, formatted: "", cleanRaw: "" };
+
+  const num = value.replace(/\D/g, "");
+  let type = "Chave Inválida";
+  let isValid = false;
+  let formatted = value;
+  let cleanRaw = value;
+
+  if (num.length === 11 && isValidCPF(num)) {
+    type = "CPF";
+    isValid = true;
+    cleanRaw = num;
+    formatted = num.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  } else if (num.length === 14 && isValidCNPJ(num)) {
+    type = "CNPJ";
+    isValid = true;
+    cleanRaw = num;
+    formatted = num.replace(
+      /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+      "$1.$2.$3/$4-$5",
+    );
+  } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    type = "E-mail";
+    isValid = true;
+    cleanRaw = value.trim();
+    formatted = cleanRaw;
+  } else if (num.length >= 10 && num.length <= 11 && !value.includes("@")) {
+    type = "Telefone";
+    isValid = true;
+    cleanRaw = num;
+    formatted =
+      num.length === 11
+        ? num.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+        : num.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  } else if (value.length >= 32) {
+    type = "Aleatória";
+    isValid = true;
+    cleanRaw = value.trim();
+    formatted = cleanRaw;
+  }
+
+  return { type, isValid, formatted, cleanRaw };
+};
+
+// ==========================================
 // COMPONENTE ISOLADO: INPUT DA CHAVE PIX
 // ==========================================
 const PixKeyInput = ({
@@ -73,74 +122,20 @@ const PixKeyInput = ({
   });
 
   useEffect(() => {
-    // DEBOUNCE: Espera 400ms após o usuário parar de digitar
+    // DEBOUNCE: Espera 400ms para aplicar a validação visual
     const handler = setTimeout(() => {
-      if (!value) {
-        setInfo({ type: "", isValid: false, formatted: "" });
-        return;
-      }
+      const validation = validatePixKey(value);
+      setInfo(validation);
 
-      const num = value.replace(/\D/g, "");
-      let type = "Chave Inválida";
-      let isValid = false;
-      let formatted = value;
-      let cleanRaw = value;
-
-      // 1. É CPF?
-      if (num.length === 11 && isValidCPF(num)) {
-        type = "CPF";
-        isValid = true;
-        cleanRaw = num; // Salva só números crus
-        formatted = num.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-      }
-      // 2. É CNPJ?
-      else if (num.length === 14 && isValidCNPJ(num)) {
-        type = "CNPJ";
-        isValid = true;
-        cleanRaw = num;
-        formatted = num.replace(
-          /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
-          "$1.$2.$3/$4-$5",
-        );
-      }
-      // 3. É E-mail?
-      else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        type = "E-mail";
-        isValid = true;
-        cleanRaw = value.trim();
-        formatted = cleanRaw;
-      }
-      // 4. É Telefone?
-      else if (num.length >= 10 && num.length <= 11 && !value.includes("@")) {
-        type = "Telefone";
-        isValid = true;
-        cleanRaw = num;
-        formatted =
-          num.length === 11
-            ? num.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
-            : num.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
-      }
-      // 5. É Chave Aleatória? (Tamanho padrão de UUID é 36)
-      else if (value.length >= 32) {
-        type = "Aleatória";
-        isValid = true;
-        cleanRaw = value.trim();
-        formatted = cleanRaw;
-      }
-
-      setInfo({ type, isValid, formatted });
-
-      // O PULO DO GATO: Se o usuário colou com máscara, e a chave é válida,
-      // nós enviamos silenciosamente pro estado pai APENAS os dados crus.
-      if (isValid && value !== cleanRaw) {
-        onChangeText(cleanRaw);
+      // Limpa os dados pro pai silenciosamente caso tenha máscara colada
+      if (validation.isValid && value !== validation.cleanRaw) {
+        onChangeText(validation.cleanRaw);
       }
     }, 400);
 
     return () => clearTimeout(handler);
   }, [value]);
 
-  // Exibe a máscara SOMENTE se for válida e NÃO estiver editando (focado)
   const displayValue = !isFocused && info.isValid ? info.formatted : value;
 
   return (
@@ -260,8 +255,22 @@ export default function SetupScreen() {
     setProfileToDeleteIndex(null);
   };
 
+  // 💡 A MÁGICA ACONTECE AQUI: Nova regra de permissão
+  // 💡 A MÁGICA ACONTECE AQUI: Nova regra de permissão rigorosa e justa
   const canGo =
-    forms.length >= 2 && forms.every((f) => f.name.trim().length >= 2);
+    forms.length >= 2 &&
+    forms.every((f) => {
+      const isNameValid = f.name.trim().length >= 2;
+
+      const pixValue = f.pixKey.trim();
+      // A chave é considerada "válida" para o sistema se:
+      // 1. Estiver totalmente vazia (pois é opcional).
+      // 2. OU tiver texto e for aprovada pelo validador.
+      // Note que removemos a dependência do `f.showPix`. Se estiver fechado e inválido, bloqueia!
+      const isPixValid = pixValue === "" || validatePixKey(pixValue).isValid;
+
+      return isNameValid && isPixValid;
+    });
 
   const handleSubmit = () => {
     if (!canGo) return;
@@ -270,6 +279,9 @@ export default function SetupScreen() {
         id: f.id,
         name: f.name.trim(),
         color: f.color,
+        // Como o botão só libera se estiver válido ou vazio,
+        // salvamos os dados independentemente de a aba estar aberta ou fechada.
+        // (Afinal, o usuário pode ter digitado a chave certa e só fechado a aba para economizar espaço na tela).
         pixKey: f.pixKey.trim(),
         pixName: f.pixName.trim(),
         pixCity: f.pixCity.trim(),
@@ -373,14 +385,12 @@ export default function SetupScreen() {
 
               {form.showPix && (
                 <PixFormContainer>
-                  {/* 💡 Novo Componente Inteligente da Chave Pix */}
                   <PixKeyInput
                     value={form.pixKey}
                     onChangeText={(v) => upd(i, "pixKey", v)}
                     colors={colors}
                   />
 
-                  {/* Demais inputs (Nome e Cidade) mapeados normalmente */}
                   {(
                     [
                       [
@@ -614,7 +624,6 @@ const InputContainer = styled.View`
   margin-bottom: 12px;
 `;
 
-// 💡 Novos componentes de estilo para o layout da Label com o Badge do Pix
 const LabelRow = styled.View`
   flex-direction: row;
   justify-content: space-between;

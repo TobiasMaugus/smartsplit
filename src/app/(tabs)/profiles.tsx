@@ -25,22 +25,100 @@ import { ThemeColors } from "../../constants/theme";
 import { useAppContext } from "../../context/AppContext";
 import { useThemeContext } from "../../context/ThemeContext";
 
-const ThemedPencil = styled(Pencil).attrs(({ theme }: { theme: ThemeColors }) => ({
-  color: theme.background, // O Lucide lerá essa propriedade automaticamente
-}))``;
+const ThemedPencil = styled(Pencil).attrs(
+  ({ theme }: { theme: ThemeColors }) => ({
+    color: theme.background,
+  }),
+)``;
+
+// ==========================================
+// FUNÇÕES DE MÁSCARA E IDENTIFICAÇÃO (Apenas Visual)
+// ==========================================
+const isValidCPF = (cpf: string): boolean => {
+  if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+  const calc = (n: number) => {
+    let sum = 0;
+    for (let i = 0; i < n - 1; i++) sum += parseInt(cpf.charAt(i)) * (n - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 || rest === 11 ? 0 : rest;
+  };
+  return (
+    calc(10) === parseInt(cpf.charAt(9)) &&
+    calc(11) === parseInt(cpf.charAt(10))
+  );
+};
+
+const isValidCNPJ = (cnpj: string): boolean => {
+  if (cnpj.length !== 14 || !!cnpj.match(/(\d)\1{13}/)) return false;
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  const digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  if (resultado !== parseInt(digitos.charAt(0))) return false;
+
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  return resultado === parseInt(digitos.charAt(1));
+};
+
+const getPixInfo = (value: string) => {
+  const num = value.replace(/\D/g, "");
+  if (num.length === 11 && isValidCPF(num)) {
+    return {
+      type: "CPF",
+      formatted: num.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4"),
+    };
+  }
+  if (num.length === 14 && isValidCNPJ(num)) {
+    return {
+      type: "CNPJ",
+      formatted: num.replace(
+        /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+        "$1.$2.$3/$4-$5",
+      ),
+    };
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return { type: "E-MAIL", formatted: value };
+  }
+  if (num.length >= 10 && num.length <= 11 && !value.includes("@")) {
+    return {
+      type: "TELEFONE",
+      formatted:
+        num.length === 11
+          ? num.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+          : num.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3"),
+    };
+  }
+  if (value.length >= 32) {
+    return { type: "ALEATÓRIA", formatted: value };
+  }
+  return { type: "CHAVE", formatted: value };
+};
 
 export default function ProfilesScreen() {
   const { profiles, clearAllData } = useAppContext();
   const { colors } = useThemeContext();
   const insets = useSafeAreaInsets();
 
-  // --- ESTADOS ---
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(
     null,
   );
 
-  // --- LÓGICA DA ANIMAÇÃO AO ENTRAR NA ABA ---
   const rotationValue = useSharedValue(0);
   const isSettingsVisible = useSharedValue(0);
 
@@ -80,12 +158,10 @@ export default function ProfilesScreen() {
     };
   });
 
-  // --- FUNÇÕES DE AÇÃO ---
   const toggleExpand = (id: string) => {
     setExpandedProfileId(expandedProfileId === id ? null : id);
   };
 
-  // 💡 Lógica para exigir Autenticação Local antes de editar
   const handleEditProfiles = async () => {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -100,16 +176,13 @@ export default function ProfilesScreen() {
         if (authResult.success) {
           router.push("/setup");
         } else {
-          // Usuário cancelou ou errou, encerra a ação
           return;
         }
       } else {
-        // Dispositivo sem biometria/senha cadastrada, libera a edição
         router.push("/setup");
       }
     } catch (error) {
       console.error("Erro ao autenticar:", error);
-      // Fallback seguro em caso de erro na biblioteca
       router.push("/setup");
     }
   };
@@ -156,10 +229,12 @@ export default function ProfilesScreen() {
           <Subtitle>Gerencie quem participa das divisões.</Subtitle>
         </Header>
 
-        {/* 💡 Lista de Perfis com cards expansíveis */}
         <ProfilesList>
           {profiles.map((p) => {
             const isExpanded = expandedProfileId === p.id;
+
+            // 💡 Pegamos as infos visuais da chave PIX aqui
+            const pixInfo = p.pixKey ? getPixInfo(p.pixKey) : null;
 
             return (
               <ProfileCard
@@ -199,11 +274,21 @@ export default function ProfilesScreen() {
                 {isExpanded && (
                   <ProfileExpandedContent>
                     <ExpandedDivider />
-                    {p.pixKey ? (
+                    {p.pixKey && pixInfo ? (
                       <ExpandedDetails>
                         <DetailGroup>
                           <DetailLabel>Chave Pix</DetailLabel>
-                          <DetailValue>{p.pixKey}</DetailValue>
+                          {/* 💡 Nova estrutura com o Badge alinhado à direita */}
+                          <PixValueRow>
+                            <DetailValue>{pixInfo.formatted}</DetailValue>
+                            <StatusBadge
+                              style={{ backgroundColor: `${colors.accent}20` }}
+                            >
+                              <StatusText style={{ color: colors.accent }}>
+                                {pixInfo.type}
+                              </StatusText>
+                            </StatusBadge>
+                          </PixValueRow>
                         </DetailGroup>
 
                         {p.pixName && (
@@ -290,9 +375,9 @@ const ProfilesList = styled.View`
   gap: 16px;
 `;
 
-// O card principal agora é interativo e em coluna
 const ProfileCard = styled.TouchableOpacity`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   border-width: 1px;
@@ -305,7 +390,6 @@ const ProfileCard = styled.TouchableOpacity`
   position: relative;
 `;
 
-// A parte superior mantém o layout de linha que existia antes
 const ProfileCardTop = styled.View`
   flex-direction: row;
   align-items: center;
@@ -356,7 +440,8 @@ const PixText = styled.Text`
 const NoPixBadge = styled.View`
   flex-direction: row;
   align-items: center;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.warningLight};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.warningLight};
   align-self: flex-start;
   padding: 4px 10px;
   border-radius: 6px;
@@ -375,13 +460,13 @@ const NoPixText = styled.Text`
 const ActionIconWrapper = styled.View`
   width: 40px;
   height: 40px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   border-radius: 9999px;
   align-items: center;
   justify-content: center;
 `;
 
-// 💡 Novos componentes para a área expandida
 const ProfileExpandedContent = styled.View`
   margin-top: 16px;
   padding-left: 4px;
@@ -395,7 +480,8 @@ const ExpandedDivider = styled.View`
 
 const ExpandedDetails = styled.View`
   gap: 12px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   padding: 16px;
   border-radius: 12px;
   border-width: 1px;
@@ -406,12 +492,35 @@ const DetailGroup = styled.View`
   gap: 2px;
 `;
 
+// 💡 Container flexível para alinhar Chave e Badge
+const PixValueRow = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const StatusBadge = styled.View`
+  padding-horizontal: 8px;
+  padding-vertical: 3px;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const StatusText = styled.Text`
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
 const DetailLabel = styled.Text`
   font-size: 11px;
   color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 4px;
 `;
 
 const DetailValue = styled.Text`
