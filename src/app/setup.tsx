@@ -10,6 +10,176 @@ import { useAppContext } from "../context/AppContext";
 import { useThemeContext } from "../context/ThemeContext";
 import { COLORS, MAX_PROFILES, ProfileForm } from "../types";
 
+// ==========================================
+// FUNÇÕES DE VALIDAÇÃO (Extraídas do pix.ts)
+// ==========================================
+const isValidCPF = (cpf: string): boolean => {
+  if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+  const calc = (n: number) => {
+    let sum = 0;
+    for (let i = 0; i < n - 1; i++) sum += parseInt(cpf.charAt(i)) * (n - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 || rest === 11 ? 0 : rest;
+  };
+  return (
+    calc(10) === parseInt(cpf.charAt(9)) &&
+    calc(11) === parseInt(cpf.charAt(10))
+  );
+};
+
+const isValidCNPJ = (cnpj: string): boolean => {
+  if (cnpj.length !== 14 || !!cnpj.match(/(\d)\1{13}/)) return false;
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  const digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  if (resultado !== parseInt(digitos.charAt(0))) return false;
+
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  return resultado === parseInt(digitos.charAt(1));
+};
+
+// ==========================================
+// COMPONENTE ISOLADO: INPUT DA CHAVE PIX
+// ==========================================
+const PixKeyInput = ({
+  value,
+  onChangeText,
+  colors,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  colors: any;
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [info, setInfo] = useState({
+    type: "",
+    isValid: false,
+    formatted: value,
+  });
+
+  useEffect(() => {
+    // DEBOUNCE: Espera 400ms após o usuário parar de digitar
+    const handler = setTimeout(() => {
+      if (!value) {
+        setInfo({ type: "", isValid: false, formatted: "" });
+        return;
+      }
+
+      const num = value.replace(/\D/g, "");
+      let type = "Chave Inválida";
+      let isValid = false;
+      let formatted = value;
+      let cleanRaw = value;
+
+      // 1. É CPF?
+      if (num.length === 11 && isValidCPF(num)) {
+        type = "CPF";
+        isValid = true;
+        cleanRaw = num; // Salva só números crus
+        formatted = num.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+      }
+      // 2. É CNPJ?
+      else if (num.length === 14 && isValidCNPJ(num)) {
+        type = "CNPJ";
+        isValid = true;
+        cleanRaw = num;
+        formatted = num.replace(
+          /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+          "$1.$2.$3/$4-$5",
+        );
+      }
+      // 3. É E-mail?
+      else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        type = "E-mail";
+        isValid = true;
+        cleanRaw = value.trim();
+        formatted = cleanRaw;
+      }
+      // 4. É Telefone?
+      else if (num.length >= 10 && num.length <= 11 && !value.includes("@")) {
+        type = "Telefone";
+        isValid = true;
+        cleanRaw = num;
+        formatted =
+          num.length === 11
+            ? num.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+            : num.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+      }
+      // 5. É Chave Aleatória? (Tamanho padrão de UUID é 36)
+      else if (value.length >= 32) {
+        type = "Aleatória";
+        isValid = true;
+        cleanRaw = value.trim();
+        formatted = cleanRaw;
+      }
+
+      setInfo({ type, isValid, formatted });
+
+      // O PULO DO GATO: Se o usuário colou com máscara, e a chave é válida,
+      // nós enviamos silenciosamente pro estado pai APENAS os dados crus.
+      if (isValid && value !== cleanRaw) {
+        onChangeText(cleanRaw);
+      }
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [value]);
+
+  // Exibe a máscara SOMENTE se for válida e NÃO estiver editando (focado)
+  const displayValue = !isFocused && info.isValid ? info.formatted : value;
+
+  return (
+    <InputContainer>
+      <LabelRow>
+        <Label style={{ marginBottom: 0 }}>Chave Pix</Label>
+        {value.length > 0 && (
+          <StatusBadge
+            style={{
+              backgroundColor: info.isValid
+                ? `${colors.accent}20`
+                : `${colors.danger}20`,
+            }}
+          >
+            <StatusText
+              style={{ color: info.isValid ? colors.accent : colors.danger }}
+            >
+              {info.type}
+            </StatusText>
+          </StatusBadge>
+        )}
+      </LabelRow>
+      <StyledInput
+        value={displayValue}
+        onChangeText={onChangeText}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder="CPF, e-mail, telefone ou chave"
+        placeholderTextColor={colors.textMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </InputContainer>
+  );
+};
+
+// ==========================================
+// TELA PRINCIPAL (SETUP)
+// ==========================================
 const makeBlankForm = (index: number): ProfileForm => ({
   id: `perfil_${Date.now()}_${index}`,
   name: "",
@@ -30,7 +200,6 @@ export default function SetupScreen() {
     number | null
   >(null);
 
-  // 💡 Estados para o Toast Customizado Animado e Branco no Topo
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastOpacity] = useState(new Animated.Value(0));
 
@@ -47,18 +216,14 @@ export default function SetupScreen() {
     }
   }, [profiles]);
 
-  // 💡 Função para disparar o aviso animado no topo com fade-out
   const showCustomToast = (msg: string) => {
     setToastMessage(msg);
-
-    // Faz o Toast aparecer subindo a opacidade para 1
     Animated.timing(toastOpacity, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
     }).start();
 
-    // Aguarda 2.5 segundos e faz o efeito desaparecer suavemente
     setTimeout(() => {
       Animated.timing(toastOpacity, {
         toValue: 0,
@@ -83,7 +248,6 @@ export default function SetupScreen() {
       showCustomToast(`Não é possível ter menos de 2 perfis.`);
       return;
     }
-
     setProfileToDeleteIndex(index);
     setIsDeleteModalVisible(true);
   };
@@ -128,7 +292,6 @@ export default function SetupScreen() {
 
   return (
     <Container>
-      {/* 💡 Toast Animado adicionado no topo da tela */}
       {toastMessage && (
         <AnimatedToastContainer style={{ opacity: toastOpacity }}>
           <ToastText>{toastMessage}</ToastText>
@@ -154,7 +317,9 @@ export default function SetupScreen() {
                 >
                   <Trash2
                     size={16}
-                    color={forms.length > 2 ? colors.danger : colors.dangerBorder}
+                    color={
+                      forms.length > 2 ? colors.danger : colors.dangerBorder
+                    }
                   />
                 </RemoveButton>
               </CardTopRow>
@@ -185,7 +350,6 @@ export default function SetupScreen() {
                       key={c}
                       onPress={() => upd(i, "color", c)}
                       style={[{ backgroundColor: c }]}
-                      // 💡 CORREÇÃO: Garante que as duas strings fiquem em maiúsculas antes de comparar
                       $isSelected={
                         form.color?.toUpperCase() === c.toUpperCase()
                       }
@@ -209,9 +373,16 @@ export default function SetupScreen() {
 
               {form.showPix && (
                 <PixFormContainer>
+                  {/* 💡 Novo Componente Inteligente da Chave Pix */}
+                  <PixKeyInput
+                    value={form.pixKey}
+                    onChangeText={(v) => upd(i, "pixKey", v)}
+                    colors={colors}
+                  />
+
+                  {/* Demais inputs (Nome e Cidade) mapeados normalmente */}
                   {(
                     [
-                      ["pixKey", "Chave Pix", "CPF, e-mail, telefone ou chave"],
                       [
                         "pixName",
                         "Nome do Titular",
@@ -303,13 +474,13 @@ const Container = styled(SafeAreaView)`
   background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
-// 💡 Container Base com estilo Branco limpo e posicionado no Topo superior
 const ToastContainerBase = styled.View`
   position: absolute;
   top: 60px;
   left: 32px;
   right: 32px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   padding-vertical: 14px;
   padding-horizontal: 20px;
   border-radius: 20px;
@@ -317,7 +488,6 @@ const ToastContainerBase = styled.View`
   border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
   align-items: center;
   justify-content: center;
-
   shadow-color: #000;
   shadow-offset: 0px 4px;
   shadow-opacity: 0.05;
@@ -326,7 +496,6 @@ const ToastContainerBase = styled.View`
   z-index: 9999;
 `;
 
-// Vincula o component com o sistema Animated do React Native
 const AnimatedToastContainer =
   Animated.createAnimatedComponent(ToastContainerBase);
 
@@ -370,7 +539,8 @@ const Subtitle = styled.Text`
 `;
 
 const Card = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 20px;
   padding: 24px;
   margin-bottom: 20px;
@@ -406,8 +576,13 @@ const RemoveButton = styled.TouchableOpacity<RemoveButtonProps>`
   width: 32px;
   height: 32px;
   border-radius: 16px;
-  background-color: ${({ $isDisabled, theme }: { $isDisabled?: boolean; theme: ThemeColors }) =>
-    $isDisabled ? theme.backgroundElement : theme.dangerLight};
+  background-color: ${({
+    $isDisabled,
+    theme,
+  }: {
+    $isDisabled?: boolean;
+    theme: ThemeColors;
+  }) => ($isDisabled ? theme.backgroundElement : theme.dangerLight)};
   align-items: center;
   justify-content: center;
   opacity: ${(props: RemoveButtonProps) => (props.$isDisabled ? 0.45 : 1)};
@@ -439,6 +614,30 @@ const InputContainer = styled.View`
   margin-bottom: 12px;
 `;
 
+// 💡 Novos componentes de estilo para o layout da Label com o Badge do Pix
+const LabelRow = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  margin-left: 4px;
+`;
+
+const StatusBadge = styled.View`
+  padding-horizontal: 8px;
+  padding-vertical: 3px;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const StatusText = styled.Text`
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
 const Label = styled.Text`
   font-size: 11px;
   font-weight: 800;
@@ -451,7 +650,8 @@ const Label = styled.Text`
 
 const StyledInput = styled.TextInput`
   width: 100%;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.inputBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.inputBackground};
   border-radius: 12px;
   padding-vertical: 14px;
   padding-horizontal: 16px;
@@ -482,7 +682,6 @@ const ColorOption = styled.TouchableOpacity<{ $isSelected: boolean }>`
     border-width: 3px;
     border-color: ${(theme as ThemeColors).text};
     transform: scale(1.15);
-    
     shadow-color: #000;
     shadow-offset: 0px;
     shadow-opacity: 0.2;
@@ -547,8 +746,13 @@ const SubmitButton = styled.TouchableOpacity<{ $isActive: boolean }>`
   border-radius: 16px;
   align-items: center;
   justify-content: center;
-  background-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
-    $isActive ? theme.accent : theme.borderLight};
+  background-color: ${({
+    $isActive,
+    theme,
+  }: {
+    $isActive: boolean;
+    theme: ThemeColors;
+  }) => ($isActive ? theme.accent : theme.borderLight)};
 
   ${({ $isActive, theme }) =>
     $isActive &&
@@ -565,20 +769,27 @@ const SubmitButtonText = styled.Text<{ $isActive: boolean }>`
   font-weight: 800;
   font-size: 16px;
   letter-spacing: 0.3px;
-  color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
-    $isActive ? "#FFFFFF" : theme.textMuted};
+  color: ${({
+    $isActive,
+    theme,
+  }: {
+    $isActive: boolean;
+    theme: ThemeColors;
+  }) => ($isActive ? "#FFFFFF" : theme.textMuted)};
 `;
 
 const ConfirmOverlay = styled.View`
   flex: 1;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.modalOverlay};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.modalOverlay};
   justify-content: center;
   align-items: center;
   padding: 24px;
 `;
 
 const ConfirmContent = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   border-radius: 24px;
   padding: 24px;
   width: 100%;
@@ -613,7 +824,8 @@ const ActionButtonsContainer = styled.View`
 
 const ModalCancelButton = styled.TouchableOpacity`
   flex: 1;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   padding-vertical: 14px;
   border-radius: 12px;
   align-items: center;
