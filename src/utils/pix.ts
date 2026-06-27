@@ -13,9 +13,10 @@ export function generatePixBRCode(
       let rest = (sum * 10) % 11;
       return rest === 10 || rest === 11 ? 0 : rest;
     };
+    // 💡 CORREÇÃO AQUI: Passar 10 e 11 para o cálculo matemático dos dígitos
     return (
-      calc(11) === parseInt(cpf.charAt(9)) &&
-      calc(12) === parseInt(cpf.charAt(10))
+      calc(10) === parseInt(cpf.charAt(9)) &&
+      calc(11) === parseInt(cpf.charAt(10))
     );
   };
 
@@ -61,7 +62,6 @@ export function generatePixBRCode(
   } else if (finalKey.length > 14) {
     // É Chave Aleatória (UUID normalmente tem 36 caracteres)
     finalKey = finalKey;
-    // ... dentro do bloco de checação de chaves ...
   } else {
     // É Telefone!
     // Se já tem 13 dígitos (55 + DDD + 9 + 8 dígitos) ou 12 dígitos (55 + DDD + 8 dígitos fixo)
@@ -135,5 +135,6 @@ export function generatePixBRCode(
   crc = crc & 0xffff;
   const crcHex = crc.toString(16).toUpperCase().padStart(4, "0");
 
+  //console.log(`Copia e Cola gerado: ${payload + crcHex}`);
   return payload + crcHex;
 }
