@@ -222,6 +222,15 @@ export default function HistoryDetail() {
       return alloc[selectedFilter] !== undefined && alloc[selectedFilter] > 0;
     }) ?? [];
 
+  // 💡 Desconto total da compra: usa o valor salvo em entry.desconto e, se
+  // não existir, cai para a soma dos descontos por item (fallback seguro).
+  const itemsDiscountSum = (entry.items ?? []).reduce(
+    (s, it) => s + (it.desconto ?? 0),
+    0,
+  );
+  const totalDiscount = entry.desconto ?? itemsDiscountSum;
+  const originalTotal = entry.total + totalDiscount;
+
   return (
     <Container>
       <Header>
@@ -252,6 +261,19 @@ export default function HistoryDetail() {
               {entry.horario ? <MetaText>às {entry.horario}</MetaText> : null}
             </Meta>
             <Total>R$ {entry.total.toFixed(2).replace(".", ",")}</Total>
+
+            {totalDiscount > 0 && (
+              <DiscountInverseBlock>
+                <DiscountLine>
+                  Descontos:{" "}
+                  <DiscountPositive>+{fmt(totalDiscount)}</DiscountPositive>
+                </DiscountLine>
+                <DiscountLine>
+                  Valor original:{" "}
+                  <DiscountOriginal>{fmt(originalTotal)}</DiscountOriginal>
+                </DiscountLine>
+              </DiscountInverseBlock>
+            )}
           </TopInfo>
         </Top>
 
@@ -316,6 +338,13 @@ export default function HistoryDetail() {
             filteredItems.map((it: GroceryItem) => {
               const alloc = entry.allocs?.[it.id] ?? {};
               const allocEntries = Object.entries(alloc);
+              const itemDesconto = it.desconto ?? 0;
+              const itemHasDiscount = itemDesconto > 0;
+              const itemOriginalTotal = it.unitPrice * it.totalUnits;
+              const itemFinalTotal = Math.max(
+                0,
+                itemOriginalTotal - itemDesconto,
+              );
 
               return (
                 <ItemRow key={it.id}>
@@ -325,6 +354,22 @@ export default function HistoryDetail() {
                       R$ {it.unitPrice.toFixed(2).replace(".", ",")} / un
                     </ItemUnitPrice>
                   </ItemHeader>
+
+                  {/* 💡 Só aparece em itens que tiveram desconto; os demais
+                      ficam exatamente como estavam. */}
+                  {itemHasDiscount && (
+                    <ItemDiscountRow>
+                      <ItemOriginalPrice>
+                        {fmt(itemOriginalTotal)}
+                      </ItemOriginalPrice>
+                      <ItemDiscountBadge>
+                        <ItemDiscountBadgeText>
+                          -{fmt(itemDesconto)}
+                        </ItemDiscountBadgeText>
+                      </ItemDiscountBadge>
+                      <ItemFinalPrice>{fmt(itemFinalTotal)}</ItemFinalPrice>
+                    </ItemDiscountRow>
+                  )}
 
                   <AllocationsWrapper>
                     {allocEntries.map(([pid, units]) => {
@@ -572,6 +617,28 @@ const MetaText = styled.Text`
   color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
   font-weight: 600;
 `;
+
+// 💡 Resumo de desconto total "invertido": o Total acima não muda, e aqui
+// embaixo aparece quanto foi de desconto (em destaque, tom aqua/accent,
+// como algo positivo) e depois o valor original (antes do desconto).
+const DiscountInverseBlock = styled.View`
+  margin-top: 4px;
+  gap: 2px;
+`;
+const DiscountLine = styled.Text`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
+`;
+const DiscountPositive = styled.Text`
+  font-weight: 800;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
+`;
+const DiscountOriginal = styled.Text`
+  font-weight: 700;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textSecondary};
+`;
+
 const Divider = styled.View`
   height: 1px;
   background-color: ${({ theme }: { theme: ThemeColors }) => theme.divider};
@@ -639,6 +706,38 @@ const ItemUnitPrice = styled.Text`
   font-weight: 600;
   color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
 `;
+
+// 💡 Linha de preço original → desconto → preço final, exibida apenas nos
+// itens que tiveram desconto.
+const ItemDiscountRow = styled.View`
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+`;
+const ItemOriginalPrice = styled.Text`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
+  text-decoration-line: line-through;
+`;
+const ItemDiscountBadge = styled.View`
+  background-color: ${({ theme }: { theme: ThemeColors }) => theme.accentLight};
+  padding: 2px 8px;
+  border-radius: 999px;
+`;
+const ItemDiscountBadgeText = styled.Text`
+  font-size: 11px;
+  font-weight: 800;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.accent};
+`;
+const ItemFinalPrice = styled.Text`
+  font-size: 13px;
+  font-weight: 800;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.text};
+`;
+
 const AllocationsWrapper = styled.View`
   gap: 6px;
 `;

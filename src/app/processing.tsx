@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { View } from "react-native";
+import { TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styled from "styled-components/native";
 import { getInitials } from "../components/Avatar";
@@ -34,13 +34,10 @@ export default function ProcessingScreen() {
     allocs: globalAllocs,
     setItems,
     setAllocs: setGlobalAllocs,
+    scrapedDiscount,
+    scrapedPaid,
   } = useAppContext();
   const { colors, isDark } = useThemeContext();
-
-  const PURCHASE_TOTAL = items.reduce(
-    (s, i) => s + i.totalUnits * i.unitPrice,
-    0,
-  );
 
   const mkRemaining = () =>
     Object.fromEntries(items.map((i) => [i.id, i.totalUnits]));
@@ -59,17 +56,131 @@ export default function ProcessingScreen() {
   const [remaining, setRemaining] =
     useState<Record<string, number>>(mkRemaining);
   const [allocs, setAllocs] = useState<Allocations>(globalAllocs ?? {});
+
+  // Descontos por item: estado LOCAL desta tela (não vive em `items` do
+  // contexto). Isso é o que garante a consistência do desconto remanescente:
+  // editar o desconto nunca mais dispara o efeito de inicialização abaixo
+  // (que reseta curIdx, undoStack, seleção etc.), porque `items` deixa de
+  // mudar de referência a cada tecla digitada. O valor só é sincronizado de
+  // volta para o contexto em onFinalize().
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, number>>(
+    () =>
+      Object.fromEntries(items.map((i) => [i.id, (i as any).desconto ?? 0])),
+  );
+
   const [curIdx, setCurIdx] = useState(0);
   const [qty, setQty] = useState(1);
   const [personalizado, setPersonalizado] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [isScrollable, setIsScrollable] = useState(false);
+  const [descontoText, setDescontoText] = useState<string>("0,00");
+  const pendingDescontoRef = React.useRef<string>("0,00");
+  const [descontoWarning, setDescontoWarning] = useState<string | null>(null);
+  const warningTimerRef = React.useRef<number | null>(null);
+
+  const totalBeforeDiscount = items.reduce(
+    (s, i) => s + i.totalUnits * i.unitPrice,
+    0,
+  );
+  const totalDiscounts = items.reduce(
+    (s, i) => s + (itemDiscounts[i.id] ?? 0),
+    0,
+  );
+  const PURCHASE_TOTAL = Math.max(0, totalBeforeDiscount - totalDiscounts);
+
+  const formatMoneyFromDigits = (digits: string) => {
+    const d = (digits || "").replace(/\D/g, "");
+    if (!d) return "0,00";
+    if (d.length === 1) return "0,0" + d;
+    if (d.length === 2) return "0," + d.padStart(2, "0");
+    const intPart = d.slice(0, -2);
+    const cents = d.slice(-2);
+    return intPart + "," + cents;
+  };
+
+  const roundToCents = (v: number) =>
+    Math.round((v + Number.EPSILON) * 100) / 100;
+
+  // Total de desconto efetivamente disponível para distribuir entre os
+  // itens, respeitando o valor extraído do cupom e o valor pago (não deixa
+  // o total da compra cair abaixo do valor pago).
+  const effectiveTotalDiscount = React.useMemo(() => {
+    const totalScraped = roundToCents(scrapedDiscount ?? 0);
+    const maxFromPaid = roundToCents(
+      Math.max(0, totalBeforeDiscount - (scrapedPaid ?? 0)),
+    );
+    return Math.max(0, Math.min(totalScraped, maxFromPaid));
+  }, [scrapedDiscount, scrapedPaid, totalBeforeDiscount]);
+
+  // Desconto restante: fonte única de verdade, sempre derivada do que já
+  // foi distribuído entre os itens (itemDiscounts). Não existe mais um
+  // state próprio para isso, então nunca fica dessincronizado.
+  const remainingDiscount = React.useMemo(() => {
+    const totalAssigned = roundToCents(
+      Object.values(itemDiscounts).reduce((s, v) => s + (v || 0), 0),
+    );
+    return Math.max(0, roundToCents(effectiveTotalDiscount - totalAssigned));
+  }, [itemDiscounts, effectiveTotalDiscount]);
+
+  // Efetiva (clampa e salva) o desconto digitado para um item. Chamada a
+  // cada tecla — não só no blur — para se comportar como um input de app
+  // bancário: o valor já vale enquanto o usuário digita.
+  const commitItemDiscount = (itemId: string, rawText: string) => {
+    const parsed = parseFloat(rawText.replace(/,/g, "."));
+    const newValue = roundToCents(Number.isFinite(parsed) ? parsed : 0);
+
+    const sumOther = Object.entries(itemDiscounts).reduce(
+      (s, [id, v]) => (id === itemId ? s : s + (v || 0)),
+      0,
+    );
+    const maxAllowedForThis = Math.max(
+      0,
+      roundToCents(effectiveTotalDiscount - roundToCents(sumOther)),
+    );
+
+    if (newValue > maxAllowedForThis) {
+      const msg = `Desconto máximo disponível: ${fmt(maxAllowedForThis)}`;
+      setDescontoWarning(msg);
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+      // @ts-ignore - NodeJS.Timeout vs number in RN
+      warningTimerRef.current = setTimeout(
+        () => setDescontoWarning(null),
+        3000,
+      ) as unknown as number;
+    } else {
+      setDescontoWarning(null);
+    }
+
+    const clamped = Math.min(newValue, maxAllowedForThis);
+    setItemDiscounts((prev) => ({ ...prev, [itemId]: clamped }));
+
+    // Reflete no input o valor final aplicado (já formatado), caso tenha
+    // sido clampado.
+    const formattedClamped = String(clamped.toFixed(2)).replace(".", ",");
+    pendingDescontoRef.current = formattedClamped;
+    setDescontoText(formattedClamped);
+  };
+
+  const handleDescontoInput = (raw: string) => {
+    const curItem = items[curIdx];
+    if (!curItem) return;
+    const digits = raw.replace(/\D/g, "");
+    const formatted = formatMoneyFromDigits(digits);
+    // Atualiza o texto exibido imediatamente...
+    pendingDescontoRef.current = formatted;
+    setDescontoText(formatted);
+    // ...e já efetiva o valor a cada tecla, sem esperar o blur.
+    commitItemDiscount(curItem.id, formatted);
+  };
 
   useEffect(() => {
     const initialAllocs = Object.keys(globalAllocs).length ? globalAllocs : {};
     setAllocs(initialAllocs);
     setRemaining(buildRemainingFromAllocs(initialAllocs));
+    setItemDiscounts(
+      Object.fromEntries(items.map((i) => [i.id, (i as any).desconto ?? 0])),
+    );
 
     const nextItemIndex = items.findIndex(
       (item) => buildRemainingFromAllocs(initialAllocs)[item.id] > 0,
@@ -79,10 +190,24 @@ export default function ProcessingScreen() {
     setQty(1);
     setPersonalizado(false);
     setUndoStack([]);
-  }, [items, globalAllocs]);
+  }, [items, globalAllocs, scrapedDiscount]);
+
+  // Ao trocar de produto, exibe no input o desconto já atribuído a este
+  // item (ou 0,00 se não houver).
+  useEffect(() => {
+    const curItem = items[curIdx];
+    const curValue = roundToCents(
+      curItem ? (itemDiscounts[curItem.id] ?? 0) : 0,
+    );
+    const formatted = String(curValue.toFixed(2)).replace(".", ",");
+    pendingDescontoRef.current = formatted;
+    setDescontoText(formatted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curIdx]);
 
   const cur = items[curIdx];
   const rem = cur ? (remaining[cur.id] ?? 0) : 0;
+  const curDesconto = cur ? (itemDiscounts[cur.id] ?? 0) : 0;
   const allDone =
     items.length > 0 && Object.values(remaining).every((v) => v === 0);
   const doneCount = items.filter((i) => remaining[i.id] === 0).length;
@@ -95,6 +220,17 @@ export default function ProcessingScreen() {
     profileCount <= 2 ? "spacious" : profileCount <= 6 ? "normal" : "compact";
   const contentGap =
     profileCount === 2 ? 170 : avatarDensity === "spacious" ? 14 : 18;
+
+  const discountVisible = remainingDiscount > 0 || curDesconto > 0;
+  const qtySelectorVisible = rem > 1;
+
+  // Quanto mais seções extras (qtd. e/ou desconto) aparecem, menor o gap,
+  // pra tentar caber tudo sem precisar de scroll.
+  const extraSections = [discountVisible, qtySelectorVisible].filter(
+    Boolean,
+  ).length;
+  const effectiveContentGap =
+    extraSections === 2 ? 6 : extraSections === 1 ? 10 : contentGap;
 
   const pushUndo = (r: Record<string, number>, a: Allocations, idx: number) =>
     setUndoStack((s) => [
@@ -176,6 +312,7 @@ export default function ProcessingScreen() {
   };
 
   const reset = () => {
+    // Zera alocações e restaura remaining e estado do input
     setRemaining(mkRemaining());
     setAllocs({});
     setCurIdx(0);
@@ -183,9 +320,23 @@ export default function ProcessingScreen() {
     setQty(1);
     setSelected([]);
     setPersonalizado(false);
+
+    // Zera os descontos locais; remainingDiscount se recalcula sozinho
+    // (é derivado), não precisa ser tocado aqui.
+    setItemDiscounts(Object.fromEntries(items.map((i) => [i.id, 0])));
+
+    pendingDescontoRef.current = "0,00";
+    setDescontoText("0,00");
+    setDescontoWarning(null);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
   };
 
   const onFinalize = () => {
+    // Persiste os descontos locais de volta nos itens do contexto, para
+    // que a tela de resumo tenha os valores corretos.
+    setItems((prev) =>
+      prev.map((it) => ({ ...it, desconto: itemDiscounts[it.id] ?? 0 })),
+    );
     setGlobalAllocs(allocs);
     router.replace("/summary");
   };
@@ -308,7 +459,7 @@ export default function ProcessingScreen() {
             <DoneSubtitle>Clique em Finalizar para ver o resumo.</DoneSubtitle>
           </DoneContainer>
         ) : (
-          <View style={{ gap: contentGap, flex: 1 }}>
+          <View style={{ gap: effectiveContentGap, flex: 1 }}>
             <Card $density={avatarDensity}>
               <CardLabel>Produto atual</CardLabel>
               <ItemTitle $density={avatarDensity} numberOfLines={2}>
@@ -355,6 +506,33 @@ export default function ProcessingScreen() {
                     />
                   </QtyButton>
                 </QtyContainer>
+              </Card>
+            )}
+
+            {/* Desconto da compra (se houver) - permite alocar por item enquanto houver saldo */}
+            {discountVisible && (
+              <Card $density={avatarDensity}>
+                <CardLabel>Desconto</CardLabel>
+                <DescontoTopRow>
+                  <ItemPrice $density={avatarDensity} style={{ flexShrink: 1 }}>
+                    Restante: {fmt(remainingDiscount)}
+                  </ItemPrice>
+                  <DescontoInputPill>
+                    <DescontoPrefix>R$</DescontoPrefix>
+                    <DescontoInput
+                      keyboardType="numeric"
+                      placeholder="0,00"
+                      placeholderTextColor={colors.textMuted}
+                      value={descontoText}
+                      onChangeText={handleDescontoInput}
+                      returnKeyType="done"
+                      style={{ color: colors.text }}
+                    />
+                  </DescontoInputPill>
+                </DescontoTopRow>
+                {descontoWarning && (
+                  <WarningText>{descontoWarning}</WarningText>
+                )}
               </Card>
             )}
 
@@ -434,7 +612,10 @@ export default function ProcessingScreen() {
             activeOpacity={0.7}
             style={{ flex: 1 }}
           >
-            <Undo2 size={18} color={undoStack.length ? colors.textSecondary : colors.textMuted} />
+            <Undo2
+              size={18}
+              color={undoStack.length ? colors.textSecondary : colors.textMuted}
+            />
             <ActionButtonText
               $variant={undoStack.length ? "default" : "disabled"}
             >
@@ -465,10 +646,12 @@ const Container = styled(SafeAreaView)`
 `;
 
 const TopPanel = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   padding: 16px 24px 16px 24px;
   border-bottom-width: 1px;
-  border-bottom-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
+  border-bottom-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.borderLight};
   z-index: 10;
 `;
 
@@ -495,7 +678,8 @@ const CancelButton = styled.TouchableOpacity`
   width: 28px;
   height: 28px;
   border-radius: 14px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -522,7 +706,8 @@ const ProgressLabel = styled.Text`
 
 const ProgressTrack = styled.View`
   height: 7px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   border-radius: 3px;
   overflow: hidden;
 `;
@@ -573,7 +758,8 @@ const DoneSubtitle = styled.Text`
 `;
 
 const Card = styled.View<{ $density?: "spacious" | "normal" | "compact" }>`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 20px;
   padding: ${({ $density }) =>
     $density === "spacious"
@@ -677,7 +863,8 @@ const QtyButton = styled.TouchableOpacity<{
         ? "44px"
         : "48px"};
   border-radius: 16px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -699,7 +886,8 @@ const ToggleCard = styled.View`
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 20px;
   padding: 16px 20px;
   border-width: 1px;
@@ -730,8 +918,13 @@ const SwitchTrack = styled.TouchableOpacity<{ $isActive: boolean }>`
   width: 46px;
   height: 26px;
   border-radius: 13px;
-  background-color: ${({ $isActive, theme }: { $isActive: boolean; theme: ThemeColors }) =>
-    $isActive ? theme.accent : theme.borderLight};
+  background-color: ${({
+    $isActive,
+    theme,
+  }: {
+    $isActive: boolean;
+    theme: ThemeColors;
+  }) => ($isActive ? theme.accent : theme.borderLight)};
   justify-content: center;
   padding-horizontal: 2px;
 `;
@@ -858,13 +1051,63 @@ const HelperText = styled.Text`
   font-weight: 600;
 `;
 
+// --- Input de desconto (estilo "app de banco") ---
+
+const DescontoTopRow = styled.View`
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const DescontoInputPill = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding-horizontal: 12px;
+  border-radius: 12px;
+  border-width: 1px;
+  border-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
+  flex-shrink: 0;
+`;
+
+const DescontoPrefix = styled.Text`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${({ theme }: { theme: ThemeColors }) => theme.textMuted};
+`;
+
+const DescontoInput = styled(TextInput)`
+  min-width: 64px;
+  max-width: 110px;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: right;
+  padding: 0px;
+`;
+
+// O aviso agora é um bloco de largura livre dentro do Card (sem maxWidth
+// fixo nem alinhamento forçado dentro de uma row estreita), então ele quebra
+// linha normalmente em vez de vazar para fora da tela.
+const WarningText = styled.Text`
+  margin-top: 8px;
+  font-size: 12px;
+  color: #d14343;
+  text-align: right;
+  font-weight: 700;
+`;
+
 const Spacing = styled.View`
   height: 16px;
 `;
 
 const BottomBar = styled.View`
   padding: 12px 24px 24px 24px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   border-top-width: 1px;
   border-top-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
@@ -883,7 +1126,13 @@ const ActionButton = styled.TouchableOpacity<{
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: ${({ $variant, theme }: { $variant: string; theme: ThemeColors }) => {
+  background-color: ${({
+    $variant,
+    theme,
+  }: {
+    $variant: string;
+    theme: ThemeColors;
+  }) => {
     if ($variant === "primary") return theme.accent;
     if ($variant === "disabled") return theme.backgroundElement;
     return theme.backgroundElement;

@@ -22,8 +22,18 @@ import { useAppContext } from "../../context/AppContext";
 import { useThemeContext } from "../../context/ThemeContext";
 
 export default function MainScreen() {
-  const { profiles, setItems, setScrapedMarket, setScrapedDate } =
-    useAppContext();
+  const {
+    profiles,
+    setItems,
+    setScrapedMarket,
+    setScrapedDate,
+    scrapedTotal,
+    setScrapedTotal,
+    scrapedPaid,
+    setScrapedPaid,
+    scrapedDiscount,
+    setScrapedDiscount,
+  } = useAppContext();
   const { setScrapedTime } = useAppContext();
   const { isDark, colors } = useThemeContext();
   const [permission, requestPermission] = useCameraPermissions();
@@ -74,10 +84,34 @@ export default function MainScreen() {
         );
 
         if (msg.data.length > 0) {
-          setItems(msg.data);
+          // Inicializa o campo desconto por item
+          const itemsWithDiscount = msg.data.map((it: any) => ({
+            ...it,
+            desconto: 0,
+          }));
+
+          setItems(itemsWithDiscount);
           setScrapedMarket(msg.marketName || "");
           setScrapedDate(msg.dateCompra || "");
           setScrapedTime(msg.horarioCompra || "");
+
+          // Valores agregados (se fornecidos pelo injector)
+          if (typeof msg.totalCompra === "number") {
+            setScrapedTotal(msg.totalCompra);
+          } else {
+            setScrapedTotal(null);
+          }
+          if (typeof msg.valorPago === "number") {
+            setScrapedPaid(msg.valorPago);
+          } else {
+            setScrapedPaid(null);
+          }
+
+          if (typeof msg.desconto === "number") {
+            setScrapedDiscount(msg.desconto);
+          } else {
+            setScrapedDiscount(null);
+          }
 
           setScannedUrl(null);
           router.push("/processing");
@@ -105,7 +139,7 @@ export default function MainScreen() {
       let finished = false;
       let waitingMessageSent = false;
       let attempts = 0;
-      const MAX_ATTEMPTS = 300; // ~5 minutos, verificando a cada segundo
+      const MAX_ATTEMPTS = 300;
 
       const send = (payload) => {
         try {
@@ -121,24 +155,18 @@ export default function MainScreen() {
       const parseBrazilianNumber = (value) => {
         if (value == null) return NaN;
         let s = String(value).trim();
-        // remove any characters except digits, dot, comma and minus
         s = s.replace(/[^0-9.,-]/g, '');
         if (s === '') return NaN;
 
-        // If the string contains both '.' and ',', assume '.' is thousands
-        // separator and ',' is decimal separator (e.g. 1.234,56)
         if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) {
           s = s.replace(/\\./g, '').replace(/,/g, '.');
           return parseFloat(s);
         }
 
-        // If it contains only comma, treat comma as decimal separator (e.g. 1,23)
         if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
           return parseFloat(s.replace(/,/g, '.'));
         }
 
-        // If it contains only dot (e.g. 1.0000) treat dot as decimal separator
-        // (do not strip dots)
         return parseFloat(s);
       };
 
@@ -148,8 +176,6 @@ export default function MainScreen() {
         const bodyText = normalize(document.body?.innerText || '');
         if (!bodyText) return;
 
-        // Enquanto a SEF ainda estiver exibindo a etapa de verificação,
-        // não tentamos interpretar a página como uma NFC-e.
         const captchaText = /verifique|verificação|verificacao|não sou um robô|nao sou um robo|recaptcha|captcha/i.test(bodyText);
         const productText = /(?:Produtos e Serviços|Produtos e Servi[cç]os|Qtde|Quantidade|Vl\\.? Unit|Valor Unit)/i.test(bodyText);
 
@@ -162,7 +188,6 @@ export default function MainScreen() {
           return;
         }
 
-        // Se a página ainda não tem estrutura de NFC-e, continua aguardando.
         if (!productText) return;
 
         const items = [];
@@ -211,7 +236,6 @@ export default function MainScreen() {
         rows.forEach((row) => {
           const text = normalize(row.innerText);
 
-          // Formato atual/mais comum do portal.
           const match = text.match(
             /(.*?)\\s*\\(C[oó]digo:.*?\\).*?Qtde.*?:\\s*([0-9.,]+)\\s*UN:\\s*([A-Za-z]+).*?(?:Valor|Vl).*?:\\s*R\\$\\s*([0-9.,]+)/i
           );
@@ -246,57 +270,80 @@ export default function MainScreen() {
           }
         });
 
-        // Fallback para formato antigo.
-        if (items.length === 0) {
-          const nameElements = document.querySelectorAll('.txtTit2');
-
-          nameElements.forEach((nameEl) => {
-            const name = normalize(nameEl.innerText);
-            let currentEl = nameEl.closest('tr') || nameEl.parentElement;
-            let qty = 1;
-            let unitPrice = 0;
-
-            for (let i = 0; i < 5 && currentEl; i++) {
-              currentEl = currentEl.nextElementSibling;
-              if (!currentEl) break;
-
-              const text = currentEl.innerText || '';
-              if (text.includes('Qtde') || text.includes('Vl. Unit')) {
-                const qMatch = text.match(/(?:Qtde|Qtd).*?([0-9]+,[0-9]+)/i);
-                const pMatch = text.match(/(?:Vl.*?Unit).*?([0-9]+,[0-9]+)/i);
-
-                if (qMatch) qty = parseBrazilianNumber(qMatch[1]);
-                if (pMatch) unitPrice = parseBrazilianNumber(pMatch[1]);
-                break;
-              }
-            }
-
-            if (unitPrice > 0) {
-              items.push({
-                id: 'item_' + Date.now() + '_' + idCounter++,
-                name,
-                totalUnits: Math.max(1, Math.round(qty)),
-                unitPrice,
-              });
-            }
-          });
-        }
-
         if (items.length === 0) {
           sendLog('A página da NFC-e foi carregada, mas nenhum produto foi reconhecido.');
           return;
         }
 
-        finished = true;
-        const finalHorario = horarioCompra ? horarioCompra.trim().slice(0, 5) : '';
+        // --- 4. EXTRAÇÃO PRECISA DOS VALORES ---
+        const getValueByExactLabel = (labelRegex) => {
+          // Busca elementos curtos (como <strong>) que contenham exatamente o título
+          const elements = Array.from(document.querySelectorAll('strong, td, div, span'));
+          
+          for (const el of elements) {
+            const txt = normalize(el.innerText || el.textContent || '');
+            
+            // Filtra apenas o elemento do rótulo específico (ex: "Valor total R$")
+            if (txt.length < 40 && labelRegex.test(txt)) {
+              
+              // 1. Tenta pegar da div/elemento vizinho (estrutura padrao do Bootstrap col-lg-2)
+              let parentCol = el.closest('.col-xs-4, .col-lg-4, td');
+              let targetCol = parentCol ? parentCol.nextElementSibling : el.nextElementSibling;
 
+              if (targetCol) {
+                const targetText = normalize(targetCol.innerText || targetCol.textContent || '');
+                const match = targetText.match(/([0-9]+[.,][0-9]{2})/);
+                if (match) return parseBrazilianNumber(match[1]);
+              }
+
+              // 2. Tenta pegar do próprio container .row ou <tr>
+              const row = el.closest('.row, tr');
+              if (row) {
+                const rowText = normalize(row.innerText || row.textContent || '');
+                const numbers = rowText.match(/([0-9]+[.,][0-9]{2})/g);
+                if (numbers && numbers.length > 0) {
+                  return parseBrazilianNumber(numbers[numbers.length - 1]);
+                }
+              }
+            }
+          }
+          return NaN;
+        };
+
+        let totalCompra = getValueByExactLabel(/^Valor\\s*total\\s*(?:R\\$)?$/i);
+        let valorPago = getValueByExactLabel(/^Valor\\s*pago\\s*(?:R\\$)?$/i);
+
+        // Fallback para total se o rótulo não tiver o R$
+        if (!Number.isFinite(totalCompra)) {
+          totalCompra = getValueByExactLabel(/Valor\\s*total/i);
+        }
+
+        // Fallback se não achar o total na página: soma os itens extraídos
+        if (!Number.isFinite(totalCompra) && items.length > 0) {
+          totalCompra = items.reduce((acc, item) => acc + (item.unitPrice * item.totalUnits), 0);
+          totalCompra = Math.round(totalCompra * 100) / 100;
+        }
+
+        // Cálculo exato de desconto
+        let desconto = 0;
+        if (Number.isFinite(totalCompra) && Number.isFinite(valorPago)) {
+          desconto = Math.max(0, Math.round((totalCompra - valorPago) * 100) / 100);
+        }
+
+        const finalHorario = horarioCompra ? horarioCompra.trim().slice(0, 5) : "";
+
+        finished = true;
         sendLog('Extração concluída. Enviando dados ao React Native...');
+        sendLog('VALORES EXTRAIDOS -> totalCompra: ' + (Number.isFinite(totalCompra) ? totalCompra : 'null') + ', valorPago: ' + (Number.isFinite(valorPago) ? valorPago : 'null') + ', desconto: ' + desconto);
         send({
           type: 'ITEMS_FOUND',
           data: items,
           marketName,
           dateCompra,
           horarioCompra: finalHorario,
+          totalCompra: Number.isFinite(totalCompra) ? totalCompra : null,
+          valorPago: Number.isFinite(valorPago) ? valorPago : null,
+          desconto: desconto || 0,
         });
       }
 
@@ -320,7 +367,6 @@ export default function MainScreen() {
         }
       }, 1000);
 
-      // Também tenta imediatamente e em eventos de carregamento dinâmico.
       extractData();
       true;
     })();

@@ -45,8 +45,14 @@ const computeShares = (
   items.forEach((item) => {
     const itemAllocs = allocs[item.id] ?? {};
 
+    // Aplica desconto absoluto no item (se houver) antes de distribuir
+    const totalItemPrice =
+      item.totalUnits * item.unitPrice - (item.desconto ?? 0);
+    const effectiveUnitPrice =
+      item.totalUnits > 0 ? totalItemPrice / item.totalUnits : 0;
+
     Object.entries(itemAllocs).forEach(([pid, units]) => {
-      const cost = units * item.unitPrice;
+      const cost = units * effectiveUnitPrice;
 
       console.log(
         `Item: ${item.name} | Para: ${pid} | Qtd/Frações: ${units} | Custo Calculado: ${cost}`,
@@ -91,10 +97,12 @@ export default function SummaryScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastOpacity] = useState(new Animated.Value(0));
 
-  const PURCHASE_TOTAL = items.reduce(
+  const totalBeforeDiscount = items.reduce(
     (s, i) => s + i.totalUnits * i.unitPrice,
     0,
   );
+  const totalDiscounts = items.reduce((s, i) => s + (i.desconto ?? 0), 0);
+  const PURCHASE_TOTAL = Math.max(0, totalBeforeDiscount - totalDiscounts);
 
   const shares = computeShares(allocs, profiles, items);
   const payer = profiles.find((p) => p.id === payerId);
@@ -150,6 +158,7 @@ export default function SummaryScreen() {
       }),
       items: items,
       allocs: allocs,
+      desconto: totalDiscounts,
       participants: profiles,
     };
 
@@ -201,7 +210,7 @@ export default function SummaryScreen() {
 
     const debtLines = validDebtors.map((o: Profile) => {
       const valorIndividual = shares[o.id] ?? 0;
-      
+
       // Se TEM chave Pix, coloca os ":" e o link
       if (pixKey) {
         let texto = `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}:`;
@@ -215,7 +224,7 @@ export default function SummaryScreen() {
         const pixLink = `https://tobiasmaugus.github.io/smartsplitPIX-SITE/?codigo=${safePixCode}`;
         texto += `\n${pixLink}`;
         return texto;
-      } 
+      }
       // Se NÃO TEM chave Pix, remove os ":"
       else {
         return `• ${o.name.split(" ")[0]} deve ${fmt(valorIndividual)}`;
@@ -389,7 +398,9 @@ export default function SummaryScreen() {
                           >
                             <QrCode
                               size={16}
-                              color={payer?.pixKey ? colors.accent : colors.textMuted}
+                              color={
+                                payer?.pixKey ? colors.accent : colors.textMuted
+                              }
                             />
                           </MiniQrButton>
                         )}
@@ -431,9 +442,9 @@ export default function SummaryScreen() {
             $variant={payerId ? "dark" : "disabled"}
             activeOpacity={0.8}
           >
-            <Share2 
-              size={18} 
-              color={payerId ? colors.darkCardText : colors.textMuted} 
+            <Share2
+              size={18}
+              color={payerId ? colors.darkCardText : colors.textMuted}
             />
             <ActionText $variant={payerId ? "dark" : "disabled"}>
               Compartilhar
@@ -506,7 +517,8 @@ const ToastContainerBase = styled.View`
   top: 60px;
   left: 32px;
   right: 32px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   padding-vertical: 14px;
   padding-horizontal: 20px;
   border-radius: 20px;
@@ -617,7 +629,8 @@ const TotalIconBox = styled.View`
 `;
 
 const Card = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   margin-bottom: 16px;
@@ -720,7 +733,8 @@ const BreakdownValue = styled.Text<{ $isCompact?: boolean }>`
 
 const ProgressBarBox = styled.View`
   height: 8px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   border-radius: 4px;
   overflow: hidden;
 `;
@@ -768,13 +782,23 @@ const OwningValue = styled.Text<{ $isCompact?: boolean }>`
 `;
 
 const MiniQrButton = styled.TouchableOpacity<{ $disabled?: boolean }>`
-  background-color: ${({ $disabled, theme }: { $disabled?: boolean; theme: ThemeColors }) =>
-    $disabled ? theme.backgroundElement : theme.backgroundElevated};
+  background-color: ${({
+    $disabled,
+    theme,
+  }: {
+    $disabled?: boolean;
+    theme: ThemeColors;
+  }) => ($disabled ? theme.backgroundElement : theme.backgroundElevated)};
   padding: 6px;
   border-radius: 10px;
   border-width: 1px;
-  border-color: ${({ $disabled, theme }: { $disabled?: boolean; theme: ThemeColors }) =>
-    $disabled ? theme.borderLight : theme.accentBorder};
+  border-color: ${({
+    $disabled,
+    theme,
+  }: {
+    $disabled?: boolean;
+    theme: ThemeColors;
+  }) => ($disabled ? theme.borderLight : theme.accentBorder)};
 `;
 
 const EmptyOwning = styled.Text`
@@ -785,7 +809,8 @@ const EmptyOwning = styled.Text`
 `;
 
 const EmptyPayerBox = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 24px;
   padding: 20px;
   flex-direction: row;
@@ -799,7 +824,8 @@ const EmptyPayerIcon = styled.View`
   width: 44px;
   height: 44px;
   border-radius: 22px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElement};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElement};
   align-items: center;
   justify-content: center;
 `;
@@ -812,7 +838,8 @@ const EmptyPayerText = styled.Text`
 `;
 
 const InlineSaveButton = styled.TouchableOpacity`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-width: 1px;
   border-color: ${({ theme }: { theme: ThemeColors }) => theme.borderLight};
   border-radius: 20px;
@@ -842,7 +869,8 @@ const Spacing = styled.View`
 
 const BottomBar = styled.View`
   padding: 16px 24px 32px 24px;
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.backgroundElevated};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.backgroundElevated};
   border-top-width: 1px;
   border-top-color: ${({ theme }: { theme: ThemeColors }) => theme.border};
 `;
@@ -864,7 +892,7 @@ const ActionButton = styled.TouchableOpacity<{
   gap: 8px;
 
   ${({ $variant, theme }) => {
-    const t = theme as any; 
+    const t = theme as any;
 
     if ($variant === "primary")
       return `
@@ -875,7 +903,7 @@ const ActionButton = styled.TouchableOpacity<{
       shadow-radius: 12px;
       elevation: 4;
     `;
-    
+
     if ($variant === "dark")
       return `
       /* 💡 Usa a variável darkCard que já funciona para os dois temas */
@@ -886,7 +914,7 @@ const ActionButton = styled.TouchableOpacity<{
       shadow-radius: 12px;
       elevation: 4;
     `;
-    
+
     return `
       background-color: ${t.border};
     `;
@@ -901,14 +929,14 @@ const ActionText = styled.Text<{
 
   color: ${({ $variant, theme }) => {
     const t = theme as any;
-    
+
     if ($variant === "primary") return "#FFFFFF";
-    
+
     if ($variant === "dark") {
       /* 💡 Acompanha a cor de contraste do darkCard */
       return t.darkCardText;
     }
-    
+
     return t.textMuted;
   }};
 `;
