@@ -12,6 +12,7 @@ export interface GroceryItem {
   name: string;
   totalUnits: number;
   unitPrice: number;
+  desconto?: number;
 }
 
 export type Allocations = Record<string, Record<string, number>>;
@@ -35,6 +36,8 @@ export interface HistoryEntry {
   horario?: string;
   // Lista completa de itens que pertencem a esta compra
   items?: GroceryItem[];
+  // Desconto total aplicado à compra (valor absoluto)
+  desconto?: number;
   // Mapeamento de alocação por item: allocs[itemId][profileId] = unidades
   allocs?: Allocations;
   participants?: Profile[];

@@ -33,6 +33,12 @@ interface AppContextType {
   setScrapedDate: React.Dispatch<React.SetStateAction<string>>;
   scrapedTime: string;
   setScrapedTime: React.Dispatch<React.SetStateAction<string>>;
+  scrapedTotal: number | null;
+  setScrapedTotal: React.Dispatch<React.SetStateAction<number | null>>;
+  scrapedPaid: number | null;
+  setScrapedPaid: React.Dispatch<React.SetStateAction<number | null>>;
+  scrapedDiscount: number | null;
+  setScrapedDiscount: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,6 +56,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [scrapedMarket, setScrapedMarket] = useState("");
   const [scrapedDate, setScrapedDate] = useState("");
   const [scrapedTime, setScrapedTime] = useState("");
+  const [scrapedTotal, setScrapedTotal] = useState<number | null>(null);
+  const [scrapedPaid, setScrapedPaid] = useState<number | null>(null);
+  const [scrapedDiscount, setScrapedDiscount] = useState<number | null>(null);
 
   // Histórico em edição (quando o usuário 'refaz' um rateio)
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null);
@@ -74,6 +83,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScrapedMarket(entry.marketName ?? "");
     setScrapedDate(entry.dateCompra ?? "");
     setScrapedTime(entry.horarioCompra ?? "");
+    setScrapedTotal(entry.total ?? null);
+    const disc = entry.desconto ?? 0;
+    setScrapedDiscount(entry.desconto ?? null);
+    setScrapedPaid(
+      entry.total != null ? Math.max(0, (entry.total ?? 0) - disc) : null,
+    );
     setEditingEntry(entry);
 
     if (entry.participants && entry.participants.length > 0) {
@@ -110,6 +125,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setScrapedMarket("");
       setScrapedDate("");
       setScrapedTime("");
+      setScrapedTotal(null);
+      setScrapedPaid(null);
+      setScrapedDiscount(null);
 
       await Promise.all([
         AsyncStorage.removeItem(HISTORY_KEY),
@@ -216,6 +234,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setScrapedDate,
         scrapedTime,
         setScrapedTime,
+        scrapedTotal,
+        setScrapedTotal,
+        scrapedPaid,
+        setScrapedPaid,
+        scrapedDiscount,
+        setScrapedDiscount,
       }}
     >
       {children}

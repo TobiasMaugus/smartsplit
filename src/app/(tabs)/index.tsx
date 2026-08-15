@@ -60,6 +60,11 @@ export default function MainScreen() {
         return;
       }
 
+      if (msg.type === "WAITING_FOR_HUMAN") {
+        console.log("[WebScraping] Aguardando a verificação humana...");
+        return;
+      }
+
       if (msg.type === "ITEMS_FOUND") {
         console.log(
           `[WebScraping] Sucesso! ${msg.data.length} itens encontrados.`,
@@ -70,21 +75,17 @@ export default function MainScreen() {
 
         if (msg.data.length > 0) {
           setItems(msg.data);
-
           setScrapedMarket(msg.marketName || "");
           setScrapedDate(msg.dateCompra || "");
           setScrapedTime(msg.horarioCompra || "");
 
           setScannedUrl(null);
           router.push("/processing");
-        } else {
-          Alert.alert(
-            "Aviso",
-            "Nenhum produto encontrado nesta nota fiscal. O formato pode não ser suportado.",
-          );
-          setScannedUrl(null);
         }
-      } else if (msg.type === "ERROR") {
+        return;
+      }
+
+      if (msg.type === "ERROR") {
         console.error(`[WebScraping] Erro Fatal: ${msg.message}`);
         Alert.alert(
           "Erro de Leitura",
@@ -99,155 +100,230 @@ export default function MainScreen() {
     }
   };
 
- const INJECTED_JS = `
-    setTimeout(() => {
-      // 🔥 Função auxiliar para mandar LOGs para o React Native
-      const sendLog = (msg) => {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOG', message: msg }));
+  const INJECTED_JS = `
+    (() => {
+      let finished = false;
+      let waitingMessageSent = false;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 300; // ~5 minutos, verificando a cada segundo
+
+      const send = (payload) => {
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+        } catch (_) {}
       };
 
-      try {
-        sendLog("Iniciando a varredura do DOM...");
-        const items = [];
-        let idCounter = 1;
-        
-        // --- 1. NOME DO MERCADO ---
-        sendLog("1. Buscando nome do mercado...");
-        let marketName = "";
-        const marketEl =
-          document.querySelector("th.text-center.text-uppercase h4 b") ||
-          document.querySelector("table.table thead th h4 b") ||
-          document.querySelector("table.table th b");
-        
-        if (marketEl) {
-          let rawName = marketEl.innerText.trim();
-            
-            // 🔥 REGRA NOVA: Remove "SUPERMERCADO" ou "SUPERMERCADOS" (gi = ignora maiúsculo/minúsculo)
-            // O replace(/\\s+/g, ' ') garante que não vão sobrar espaços duplos se a palavra for cortada do meio
-            marketName = rawName
-              .replace(/SUPERMERCADOS?/gi, '')
-              .replace(/\\s+/g, ' ')
-              .trim();
-              
-            sendLog("   -> Mercado encontrado: " + marketName + " (Original: " + rawName + ")");
-        } else {
-          sendLog("   -> Aviso: Mercado não encontrado, usará o fallback.");
+      const sendLog = (message) => send({ type: 'LOG', message });
+
+      const normalize = (text) =>
+        (text || '').replace(/\\s+/g, ' ').trim();
+
+      const parseBrazilianNumber = (value) => {
+        if (value == null) return NaN;
+        let s = String(value).trim();
+        // remove any characters except digits, dot, comma and minus
+        s = s.replace(/[^0-9.,-]/g, '');
+        if (s === '') return NaN;
+
+        // If the string contains both '.' and ',', assume '.' is thousands
+        // separator and ',' is decimal separator (e.g. 1.234,56)
+        if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) {
+          s = s.replace(/\\./g, '').replace(/,/g, '.');
+          return parseFloat(s);
         }
 
-        // --- 2. DATA / HORÁRIO DA COMPRA ---
-        sendLog("2. Buscando a data e horário de emissão...");
-        let dateCompra = new Date().toLocaleDateString("pt-BR");
-        let horarioCompra = "";
+        // If it contains only comma, treat comma as decimal separator (e.g. 1,23)
+        if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
+          return parseFloat(s.replace(/,/g, '.'));
+        }
+
+        // If it contains only dot (e.g. 1.0000) treat dot as decimal separator
+        // (do not strip dots)
+        return parseFloat(s);
+      };
+
+      function extractData() {
+        if (finished) return;
+
+        const bodyText = normalize(document.body?.innerText || '');
+        if (!bodyText) return;
+
+        // Enquanto a SEF ainda estiver exibindo a etapa de verificação,
+        // não tentamos interpretar a página como uma NFC-e.
+        const captchaText = /verifique|verificação|verificacao|não sou um robô|nao sou um robo|recaptcha|captcha/i.test(bodyText);
+        const productText = /(?:Produtos e Serviços|Produtos e Servi[cç]os|Qtde|Quantidade|Vl\\.? Unit|Valor Unit)/i.test(bodyText);
+
+        if (captchaText && !productText) {
+          if (!waitingMessageSent) {
+            waitingMessageSent = true;
+            send({ type: 'WAITING_FOR_HUMAN' });
+            sendLog('Aguardando o usuário concluir a verificação da SEF/MG...');
+          }
+          return;
+        }
+
+        // Se a página ainda não tem estrutura de NFC-e, continua aguardando.
+        if (!productText) return;
+
+        const items = [];
+        let idCounter = 1;
+
+        // --- 1. NOME DO MERCADO ---
+        let marketName = '';
+        const marketEl =
+          document.querySelector('th.text-center.text-uppercase h4 b') ||
+          document.querySelector('table.table thead th h4 b') ||
+          document.querySelector('table.table th b');
+
+        if (marketEl) {
+          const rawName = normalize(marketEl.innerText);
+          marketName = rawName
+            .replace(/SUPERMERCADOS?/gi, '')
+            .replace(/\\s+/g, ' ')
+            .trim();
+        }
+
+        // --- 2. DATA / HORÁRIO ---
+        let dateCompra = new Date().toLocaleDateString('pt-BR');
+        let horarioCompra = '';
         const htmlContent = document.body.innerHTML;
 
-        // Tenta capturar: 23/05/2026 17:06:01 ou 23/05/2026 17:06
-        const dateTimeMatch = htmlContent.match(/(?:Emiss[aã]o|Data)[^0-9]*?(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/i);
+        const dateTimeMatch = htmlContent.match(
+          /(?:Emiss[aã]o|Data)[^0-9]*?(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/i
+        );
 
-        if (dateTimeMatch && dateTimeMatch[1]) {
+        if (dateTimeMatch?.[1]) {
           dateCompra = dateTimeMatch[1];
-          if (dateTimeMatch[2]) horarioCompra = dateTimeMatch[2];
-          sendLog("   -> Sucesso! Data encontrada (Regex 1): " + dateCompra + (horarioCompra ? " " + horarioCompra : ""));
+          horarioCompra = dateTimeMatch[2] || '';
         } else {
-          sendLog("   -> Aviso: Regex principal falhou, tentando Fallback secundário para data/hora...");
-          const qualquerDataMatch = htmlContent.match(/(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/);
-          if (qualquerDataMatch) {
-            dateCompra = qualquerDataMatch[1];
-            if (qualquerDataMatch[2]) horarioCompra = qualquerDataMatch[2];
-            sendLog("   -> Sucesso! Data encontrada (Fallback Secundário): " + dateCompra + (horarioCompra ? " " + horarioCompra : ""));
-          } else {
-            sendLog("   -> Erro: Nenhuma data encontrada na página. Usará a data de hoje.");
+          const fallbackDate = htmlContent.match(
+            /(\\d{2}\\/\\d{2}\\/\\d{4})(?:\\s*(\\d{2}:\\d{2}(?::\\d{2})?))?/
+          );
+          if (fallbackDate) {
+            dateCompra = fallbackDate[1];
+            horarioCompra = fallbackDate[2] || '';
           }
         }
 
-        // --- 3. PRODUTOS DA NOTA ---
-        sendLog("3. Buscando os produtos...");
+        // --- 3. PRODUTOS ---
         const rows = document.querySelectorAll('tr');
-        sendLog("   -> Total de linhas <tr> na página: " + rows.length);
-        
-        rows.forEach((row, index) => {
-          const text = row.innerText.replace(/\\s+/g, ' ').trim();
-          const match = text.match(/(.*?)\\s*\\(C[oó]digo:.*?\\).*?Qtde.*?:\\s*([0-9.,]+)\\s*UN:\\s*([A-Za-z]+).*?(?:Valor|Vl).*?:\\s*R\\$\\s*([0-9.,]+)/i);
-          
+
+        rows.forEach((row) => {
+          const text = normalize(row.innerText);
+
+          // Formato atual/mais comum do portal.
+          const match = text.match(
+            /(.*?)\\s*\\(C[oó]digo:.*?\\).*?Qtde.*?:\\s*([0-9.,]+)\\s*UN:\\s*([A-Za-z]+).*?(?:Valor|Vl).*?:\\s*R\\$\\s*([0-9.,]+)/i
+          );
+
           if (match) {
-            const name = match[1].trim();
-            const qtyRaw = parseFloat(match[2].replace(',', '.'));
-            const unitMeasure = match[3].toUpperCase();
-            const totalPriceRaw = match[4].replace(/\\./g, '').replace(',', '.');
-            const totalPrice = parseFloat(totalPriceRaw);
-            
+            const name = normalize(match[1]);
+            const qtyRaw = parseBrazilianNumber(match[2]);
+            const unitMeasure = String(match[3]).toUpperCase();
+            const totalPrice = parseBrazilianNumber(match[4]);
+
+            if (!name || !Number.isFinite(totalPrice)) return;
+
             let finalQty = 1;
             let finalUnitPrice = totalPrice;
 
-            if (Number.isInteger(qtyRaw) && qtyRaw > 0 && unitMeasure !== 'KG' && unitMeasure !== 'L') {
+            if (
+              Number.isInteger(qtyRaw) &&
+              qtyRaw > 0 &&
+              unitMeasure !== 'KG' &&
+              unitMeasure !== 'L'
+            ) {
               finalQty = qtyRaw;
               finalUnitPrice = totalPrice / qtyRaw;
             }
-            
+
             items.push({
               id: 'item_' + Date.now() + '_' + idCounter++,
               name: name + (unitMeasure === 'KG' ? ' (Peso)' : ''),
               totalUnits: finalQty,
-              unitPrice: finalUnitPrice
+              unitPrice: finalUnitPrice,
             });
           }
         });
-        sendLog("   -> Produtos encontrados usando Regex Padrão: " + items.length);
-        
-        // Fallback para formato antigo (txtTit2)
+
+        // Fallback para formato antigo.
         if (items.length === 0) {
-          sendLog("   -> Aviso: Tentando Fallback para notas antigas (.txtTit2)...");
           const nameElements = document.querySelectorAll('.txtTit2');
-          nameElements.forEach(nameEl => {
-            const name = nameEl.innerText.trim();
+
+          nameElements.forEach((nameEl) => {
+            const name = normalize(nameEl.innerText);
             let currentEl = nameEl.closest('tr') || nameEl.parentElement;
-            
             let qty = 1;
             let unitPrice = 0;
-            
-            for (let i = 0; i < 5; i++) {
+
+            for (let i = 0; i < 5 && currentEl; i++) {
               currentEl = currentEl.nextElementSibling;
               if (!currentEl) break;
-              
+
               const text = currentEl.innerText || '';
               if (text.includes('Qtde') || text.includes('Vl. Unit')) {
                 const qMatch = text.match(/(?:Qtde|Qtd).*?([0-9]+,[0-9]+)/i);
                 const pMatch = text.match(/(?:Vl.*?Unit).*?([0-9]+,[0-9]+)/i);
-                
-                if (qMatch) qty = parseFloat(qMatch[1].replace(',', '.'));
-                if (pMatch) unitPrice = parseFloat(pMatch[1].replace(',', '.'));
+
+                if (qMatch) qty = parseBrazilianNumber(qMatch[1]);
+                if (pMatch) unitPrice = parseBrazilianNumber(pMatch[1]);
                 break;
               }
             }
-            
+
             if (unitPrice > 0) {
               items.push({
                 id: 'item_' + Date.now() + '_' + idCounter++,
-                name: name,
+                name,
                 totalUnits: Math.max(1, Math.round(qty)),
-                unitPrice: unitPrice
+                unitPrice,
               });
             }
           });
-          sendLog("   -> Produtos encontrados usando Fallback Secundário: " + items.length);
         }
-        
-        // --- LÓGICA DE SALVAMENTO AJUSTADA ---
-        // Se houver um horário capturado (ex: "17:06:01"), extrai apenas os 5 primeiros caracteres ("17:06")
-        let finalHorario = horarioCompra ? horarioCompra.trim().slice(0, 5) : "";
 
-        sendLog("4. Extração concluída. Enviando dados ao React Native...");
-        window.ReactNativeWebView.postMessage(JSON.stringify({ 
-          type: 'ITEMS_FOUND', 
+        if (items.length === 0) {
+          sendLog('A página da NFC-e foi carregada, mas nenhum produto foi reconhecido.');
+          return;
+        }
+
+        finished = true;
+        const finalHorario = horarioCompra ? horarioCompra.trim().slice(0, 5) : '';
+
+        sendLog('Extração concluída. Enviando dados ao React Native...');
+        send({
+          type: 'ITEMS_FOUND',
           data: items,
-          marketName: marketName,
-          dateCompra: dateCompra,
-          horarioCompra: finalHorario
-        }));
-      } catch(err) {
-        sendLog("ERRO CRÍTICO: " + err.toString());
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: err.toString() }));
+          marketName,
+          dateCompra,
+          horarioCompra: finalHorario,
+        });
       }
-    }, 4000); // 4s para garantir que o portal carregue
+
+      sendLog('Monitor de carregamento da NFC-e iniciado.');
+
+      const interval = setInterval(() => {
+        if (finished) {
+          clearInterval(interval);
+          return;
+        }
+
+        attempts++;
+        extractData();
+
+        if (attempts >= MAX_ATTEMPTS) {
+          clearInterval(interval);
+          send({
+            type: 'ERROR',
+            message: 'Tempo limite aguardando a consulta da NFC-e. Se apareceu uma verificação, conclua-a e tente novamente.',
+          });
+        }
+      }, 1000);
+
+      // Também tenta imediatamente e em eventos de carregamento dinâmico.
+      extractData();
+      true;
+    })();
     true;
   `;
 
@@ -316,99 +392,141 @@ export default function MainScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: colors.modalOverlay,
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
+            backgroundColor: colors.background,
           }}
         >
-          <View
-            style={{
-              backgroundColor: colors.backgroundElevated,
-              width: "100%",
-              maxWidth: 340,
-              borderRadius: 24,
-              padding: 32,
-              alignItems: "center",
-              justifyContent: "center",
-              shadowColor: "#000000",
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.15,
-              shadowRadius: 16,
-              elevation: 8,
-            }}
-          >
-            <LogoSvg2
-              width={180}
-              height={50}
+          <SafeAreaView style={{ flex: 1 }}>
+            <View
               style={{
-                marginBottom: 24,
+                paddingHorizontal: 20,
+                paddingTop: 10,
+                paddingBottom: 12,
+                backgroundColor: colors.backgroundElevated,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.borderLight,
               }}
-            />
-
-            <ActivityIndicator
-              size="large"
-              color={colors.loadingAnimation}
-              style={{ transform: [{ scale: 1.2 }] }}
-            />
-
-            <ScanText
-              style={{
-                color: colors.text,
-                marginTop: 20,
-                fontSize: 16,
-                fontWeight: "600",
-                textAlign: "center",
-              }}
-            >
-              Processando nota fiscal
-            </ScanText>
-
-            <ScanText
-              style={{
-                color: colors.textSecondary,
-                marginTop: 6,
-                fontSize: 13,
-                textAlign: "center",
-                lineHeight: 18,
-              }}
-            >
-              Aguarde enquanto extraímos os produtos do cupom...
-            </ScanText>
-
-            <TouchableOpacity
-              onPress={() => setScannedUrl(null)}
-              style={{
-                marginTop: 28,
-                width: "100%",
-                height: 48,
-                backgroundColor: colors.backgroundElement,
-                borderRadius: 14,
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 1,
-                borderColor: colors.borderLight,
-              }}
-              activeOpacity={0.7}
             >
               <ScanText
-                style={{ color: colors.danger, fontSize: 14, fontWeight: "600" }}
+                style={{
+                  color: colors.text,
+                  fontSize: 17,
+                  fontWeight: "800",
+                  textAlign: "center",
+                }}
               >
-                Cancelar Leitura
+                Consulta da nota fiscal
               </ScanText>
-            </TouchableOpacity>
 
-            <View
-              style={{ height: 0, width: 0, opacity: 0, position: "absolute" }}
-            >
+              <ScanText
+                style={{
+                  color: colors.textSecondary,
+                  marginTop: 6,
+                  fontSize: 13,
+                  fontWeight: "500",
+                  textAlign: "center",
+                  lineHeight: 18,
+                }}
+              >
+                Se aparecer uma verificação de segurança, conclua-a manualmente.
+                Após a nota carregar, os produtos serão extraídos
+                automaticamente.
+              </ScanText>
+            </View>
+
+            <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
               <WebView
                 source={{ uri: scannedUrl }}
                 injectedJavaScript={INJECTED_JS}
                 onMessage={handleWebViewMessage}
-                javaScriptEnabled
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                sharedCookiesEnabled={true}
+                thirdPartyCookiesEnabled={true}
+                cacheEnabled={true}
+                originWhitelist={["*"]}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.background,
+                    }}
+                  >
+                    <ActivityIndicator
+                      size="large"
+                      color={colors.loadingAnimation}
+                    />
+                    <ScanText
+                      style={{
+                        color: colors.text,
+                        marginTop: 16,
+                        fontSize: 14,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Carregando consulta...
+                    </ScanText>
+                  </View>
+                )}
+                onError={(event) => {
+                  console.error(
+                    "[WebScraping] WebView error",
+                    event.nativeEvent,
+                  );
+                  Alert.alert(
+                    "Erro de conexão",
+                    "Não foi possível carregar a consulta da SEF/MG. Verifique sua conexão e tente novamente.",
+                  );
+                }}
+                onHttpError={(event) => {
+                  console.error(
+                    "[WebScraping] HTTP error",
+                    event.nativeEvent.statusCode,
+                    event.nativeEvent.url,
+                  );
+                }}
               />
             </View>
-          </View>
+
+            <View
+              style={{
+                padding: 12,
+                backgroundColor: colors.backgroundElevated,
+                borderTopWidth: 1,
+                borderTopColor: colors.borderLight,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setScannedUrl(null)}
+                style={{
+                  height: 46,
+                  borderRadius: 13,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.backgroundElement,
+                  borderWidth: 1,
+                  borderColor: colors.borderLight,
+                }}
+                activeOpacity={0.7}
+              >
+                <ScanText
+                  style={{
+                    color: colors.danger,
+                    fontSize: 14,
+                    fontWeight: "700",
+                  }}
+                >
+                  Cancelar leitura
+                </ScanText>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </View>
       )}
 
@@ -484,18 +602,16 @@ const Container = styled(SafeAreaView)`
   background-color: ${({ theme }: { theme: ThemeColors }) => theme.background};
 `;
 
-const ScrollContent = styled.ScrollView.attrs(({
-  theme,
-}: {
-  theme: ThemeColors;
-}) => ({
-  contentContainerStyle: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 16,
-  },
-}))`
+const ScrollContent = styled.ScrollView.attrs(
+  ({ theme }: { theme: ThemeColors }) => ({
+    contentContainerStyle: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: 32,
+      paddingBottom: 16,
+    },
+  }),
+)`
   flex: 1;
 `;
 
@@ -534,7 +650,8 @@ const CenterArea = styled.View`
 `;
 
 const MainCard = styled.View`
-  background-color: ${({ theme }: { theme: ThemeColors }) => theme.cardBackground};
+  background-color: ${({ theme }: { theme: ThemeColors }) =>
+    theme.cardBackground};
   border-radius: 24px;
   padding: 32px 24px;
   align-items: center;
